@@ -1,0 +1,28 @@
+# Build and packaging output
+bin/
+obj/
+dist/
+packages/
+*.zip
+*.nupkg
+*.user
+*.suo
+
+# Python bytecode & cache
+__pycache__/
+*.pyc
+
+# Crash reports & core dumps
+core
+*.core
+crash-reports/
+
+# Screenshots
+Screenshot_*.png
+
+# Interop scratch (generated on demand via tools/setup_interop.sh)
+il2cpp_dump*/
+interop/
+*.dummy.dll
+
+# Scratch & local tooling
