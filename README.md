@@ -20,10 +20,10 @@ Made for BOTH Windows and Linux (Android soon, im working on a client for it).
 
 Download the zip for your system from the releases page.
 
-**Windows:** `TownOfRoles-vX.X.zip`
+**Windows:** `TOR-Windows.zip`
 This one includes BepInEx. Unzip it into the game folder, then start the game like normal.
 
-**Linux:** `TOR-Linux`
+**Linux:** `TOR-Linux.zip`
 This one includes BepInEx. Unzip it into the game folder and start the game with the script:
 
 ```bash
@@ -31,7 +31,7 @@ chmod +x run_bepinex.sh
 ./run_bepinex.sh ./classicus.x86_64
 ```
 
-If you already have BepInEx on Linux, use '`TOR.dll`' instead.
+If you already have BepInEx, and wants to update the mod manually, use '`TOR.dll`' instead.
 
 Important: if you have dll files called `ClassicUs.ManuAPI.dll` or `ClassicUs.Manactor.dll` in `BepInEx/plugins`, delete them first. 
 Those plugins are not compatible with the mod.
@@ -43,26 +43,16 @@ The first time you start the game, a config file is made at `BepInEx/config/Town
 - Every role has an on/off switch. A role that is off will never be given to anyone.
 - Every role has a `Count` and a `Chance`, plus its own settings (cooldowns, uses, and so on).
 - Modifiers use `<Modifier>Probability` (0 to 100).
-- **Restart the game** after you change role switches or counts.
 
-Example:
+You can also change settings via the BepInEx/config/townofroles.cfg under the names [Crewmate Roles] [Impostor Roles] [Neutral roles] and [Modifiers].
 
-```ini
-[Crewmate Roles]
-Sheriff = true
-SheriffCount = 1
-SheriffChance = 100
-SheriffKillCooldown = 25
-```
 
-The config has four role sections: `[Crewmate Roles]`, `[Impostor Roles]`, `[Neutral Roles]` and `[Modifiers]`.
-
-In the game, click the cogwheel (the game's config window). Extra rows for the mod are added at the bottom, one `Count` row for each role that is on. You can change the values there.
-
-The cogwheel also has a **TOR** tab with three buttons:
+Classic Us settings also has a **TOR** tab with three functions:
 - **Disable Mod (until restart):** turns the mod off until you restart the game. (NOT WORKING RIGHT NOW)
 - **No Game End:** the game will not end. Good for testing (host only).
 - **Force Start:** starts the round now (host only).
+
+(These are only useful for host, nogameend and forcestart also can be accessed thru commands, read below.)
 
 ## Chat commands
 
