@@ -5,20 +5,13 @@ using System.Text;
 
 namespace TownOfRoles.Core
 {
-    // Applies a staged self-update without a preloader patcher.
     internal static class UpdateApplier
     {
-        // How many times the script retries before giving up, and how long it waits between
-        // tries. 1800 × 2s is an hour; a session longer than that leaves the pending marker in
-        // place, and the next launch re-arms the helper.
         private const int MaxWaits = 1800;
         private const int WaitSeconds = 2;
 
         private static bool _launched;
 
-        // Start (or re-start) the applier if an update is staged, and clear the staging folder
-        // otherwise. Safe to call from any thread, and at any point after BepInEx has resolved
-        // its paths.
         public static void Arm()
         {
             try
@@ -31,9 +24,6 @@ namespace TownOfRoles.Core
 
                 if (!File.Exists(pending) || !File.Exists(staged))
                 {
-                    // Nothing to apply. A leftover folder is the applier script (or a
-                    // half-written stage) from an update that was already applied, so
-                    // drop it rather than let one folder per release accumulate.
                     Cleanup(staging);
                     return;
                 }
@@ -51,16 +41,10 @@ namespace TownOfRoles.Core
             }
         }
 
-        // The helper's file name for the running platform.
         internal static string ScriptName() => IsWindows ? "apply-update.cmd" : "apply-update.sh";
 
-        // Whether this process is Windows. Read from the path separator rather than
-        // RuntimeInformation so it is answerable in the test host too.
         internal static bool IsWindows => Path.DirectorySeparatorChar == '\\';
 
-        // The applier script for a platform. Built as a string rather than written directly so
-        // the one part that can be checked without a game, the swap itself, is checkable in the
-        // test host.
         internal static string BuildScript(bool windows, string staged, string target, string pending)
         {
             var script = new StringBuilder();
@@ -100,9 +84,7 @@ namespace TownOfRoles.Core
             script.Append("PENDING='").Append(Shell(pending)).Append("'\n");
             script.Append("WAITS=0\n");
             script.Append("while [ \"$WAITS\" -lt ").Append(MaxWaits).Append(" ]; do\n");
-            // A same-directory mv is a rename: it replaces the directory entry even
-            // while the running game has the old inode open, so this normally succeeds
-            // on the first pass and the retry only matters across filesystems.
+
             script.Append("  if mv -f \"$STAGED\" \"$TARGET\" 2>/dev/null; then\n");
             script.Append("    rm -f \"$PENDING\"\n");
             script.Append("    exit 0\n");
@@ -114,16 +96,12 @@ namespace TownOfRoles.Core
             return script.ToString();
         }
 
-        // Batch escaping: a literal percent has to be doubled.
         private static string Batch(string value) =>
             (value ?? string.Empty).Replace("%", "%%");
 
-        // POSIX single-quote escaping: close, escape, reopen.
         private static string Shell(string value) =>
             (value ?? string.Empty).Replace("'", "'\\''");
 
-        // Start the script detached. The child is intentionally not waited on and not disposed:
-        // it has to outlive this process, which is the whole point.
         private static void Launch(string script, string workingDirectory)
         {
             var start = new ProcessStartInfo
@@ -137,7 +115,6 @@ namespace TownOfRoles.Core
             Process.Start(start);
         }
 
-        // Drop a staging folder that no pending update is using.
         private static void Cleanup(string staging)
         {
             try
@@ -146,8 +123,6 @@ namespace TownOfRoles.Core
             }
             catch
             {
-                // A running helper may still hold its own script open; the next launch
-                // tries again.
             }
         }
 
@@ -159,7 +134,6 @@ namespace TownOfRoles.Core
             }
             catch
             {
-                // Logging must never be the reason an update fails.
             }
         }
     }

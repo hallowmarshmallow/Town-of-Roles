@@ -1,5 +1,5 @@
 using System;
-using ClassicUs.Reactor;
+using Atomic;
 using MarshAPI;
 using HarmonyLib;
 using Il2CppInterop.Runtime.InteropTypes;
@@ -19,7 +19,6 @@ namespace TownOfRoles.Roles.Engineer
                    EngineerSystem.IsEngineer(engineer) && DateTime.UtcNow >= _cooldownUntil && ShipStatus.Instance != null;
         }
 
-        // True when any sabotage is currently active on this client's view of the ship.
         internal static bool IsSabotageActive()
         {
             var ship = ShipStatus.Instance;
@@ -28,7 +27,7 @@ namespace TownOfRoles.Roles.Engineer
             try
             {
                 var reactor = GetSystem<ReactorSystemType>(ship, SystemTypes.Reactor);
-                var seismic = GetSystem<ReactorSystemType>(ship, SystemTypes.Laboratory); // Polus seismic
+                var seismic = GetSystem<ReactorSystemType>(ship, SystemTypes.Laboratory);
                 var oxygen = GetSystem<LifeSuppSystemType>(ship, SystemTypes.LifeSupp);
                 var comms = GetSystem<HqHudSystemType>(ship, SystemTypes.Comms);
                 var lights = GetSystem<SwitchSystem>(ship, SystemTypes.Electrical);
@@ -49,16 +48,13 @@ namespace TownOfRoles.Roles.Engineer
             var ship = ShipStatus.Instance;
             if (ship == null || ship.Systems == null) return false;
 
-            // Ported from Town-Of-Us' EngineerMod/PerformKill.cs, each sabotage
-            // has its own repair protocol; a generic RpcRepairSystem(Sabotage, 0)
-            // fixes nothing.
             try
             {
                 var reactor = GetSystem<ReactorSystemType>(ship, SystemTypes.Reactor);
                 var seismic = GetSystem<ReactorSystemType>(ship, SystemTypes.Laboratory);
                 if (reactor != null && reactor.IsActive)
                 {
-                    ship.RpcRepairSystem(SystemTypes.Reactor, 16); // ClearCountdown
+                    ship.RpcRepairSystem(SystemTypes.Reactor, 16);
                     Finish();
                     return true;
                 }
@@ -72,7 +68,7 @@ namespace TownOfRoles.Roles.Engineer
                 var oxygen = GetSystem<LifeSuppSystemType>(ship, SystemTypes.LifeSupp);
                 if (oxygen != null && oxygen.IsActive)
                 {
-                    ship.RpcRepairSystem(SystemTypes.LifeSupp, 16); // ClearCountdown
+                    ship.RpcRepairSystem(SystemTypes.LifeSupp, 16);
                     Finish();
                     return true;
                 }
@@ -80,8 +76,6 @@ namespace TownOfRoles.Roles.Engineer
                 var comms = GetSystem<HqHudSystemType>(ship, SystemTypes.Comms);
                 if (comms != null && comms.IsActive)
                 {
-                    // This build's HqHudSystemType.Tags: DeactiveBit = 32, IdMask = 15, 
-                    // deactivate both consoles like the vanilla comms panels do.
                     ship.RpcRepairSystem(SystemTypes.Comms, (int)HqHudSystemType.Tags.DeactiveBit | 0);
                     ship.RpcRepairSystem(SystemTypes.Comms, (int)HqHudSystemType.Tags.DeactiveBit | 1);
                     Finish();
@@ -91,8 +85,6 @@ namespace TownOfRoles.Roles.Engineer
                 var lights = GetSystem<SwitchSystem>(ship, SystemTypes.Electrical);
                 if (lights != null && lights.Value != lights.ExpectedSwitches)
                 {
-                    // Flip every breaker host-side, then tell clients to do the same
-                    // (SwitchSystem fields don't sync from a bare repair RPC).
                     lights.ActualSwitches = lights.ExpectedSwitches;
                     lights.Value = lights.ExpectedSwitches;
                     TownOfRolesRpcMux.Send(FixLightsRpc);
@@ -106,7 +98,6 @@ namespace TownOfRoles.Roles.Engineer
                 return false;
             }
 
-            // Nothing was active: don't consume the cooldown.
             return false;
 
             void Finish() =>
@@ -117,13 +108,13 @@ namespace TownOfRoles.Roles.Engineer
         {
             try
             {
-                var system = ship.Systems.get_Item(type);
+                var system = ship.Systems[type];
                 return system?.TryCast<T>();
             }
             catch { return null; }
         }
 
-        [ReactorRpc(FixLightsRpc)]
+        [AtomicRpc(FixLightsRpc)]
         private static void OnFixLights(byte senderId)
         {
             var client = AmongUsClient.Instance;

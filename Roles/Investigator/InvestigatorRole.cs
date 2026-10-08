@@ -4,8 +4,6 @@ using TownOfRoles.Core;
 
 namespace TownOfRoles.Roles.Investigator
 {
-    // Investigator, a Crewmate who sees the footprints of other players. Ported from the
-    // original Town-Of-Us Investigator role.
     internal sealed class InvestigatorRole : CustomCrewmateRole
     {
         public const string Id = "townofroles.Investigator";

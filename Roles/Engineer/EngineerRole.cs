@@ -4,9 +4,6 @@ using TownOfRoles.Core;
 
 namespace TownOfRoles.Roles.Engineer
 {
-    // Engineer, a Crewmate who can use the game's native vent system. No custom button or asset
-    // is required; CanVent makes Classic Us handle the existing vent UI and networked vent
-    // RPCs.
     internal sealed class EngineerRole : CustomCrewmateRole
     {
         public const string Id = "townofroles.Engineer";
@@ -18,7 +15,7 @@ namespace TownOfRoles.Roles.Engineer
         public override float RoleChancePercent => RoleConfig.Chance(RoleConfig.EngineerChance);
         public override string DescriptionShort => "Fix sabotages and vent";
         public override bool CanVent => true;
-        // Engineer uses a dedicated MarshAPI ability button, not the native Kill button.
+
         public override string KillAbilityName => string.Empty;
         public override Color TeamColor => new(0.2f, 0.85f, 0.95f, 1f);
     }

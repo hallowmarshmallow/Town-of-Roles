@@ -5,13 +5,11 @@ using TownOfRoles.Core;
 
 namespace TownOfRoles.Roles.Underdog
 {
-    // Underdog gameplay logic (ported from Town-Of-Us' Underdog.cs).
     internal static class UnderdogSystem
     {
         public static bool IsUnderdog(PlayerControl player) =>
             player != null && player.Data != null && RoleRegistry.IsAssigned(player, UnderdogRole.Id);
 
-        // Host tick: apply the reduced cooldown while the Underdog is outnumbered.
         public static void Tick()
         {
             var client = AmongUsClient.Instance;
@@ -29,7 +27,7 @@ namespace TownOfRoles.Roles.Underdog
                 else
                     aliveOthers++;
             }
-            if (aliveImpostors >= aliveOthers) return; // not outnumbered: vanilla cooldown
+            if (aliveImpostors >= aliveOthers) return;
 
             var multiplier = RoleConfig.UnderdogCooldownMultiplier?.Value ?? 0.5f;
             if (multiplier <= 0f || multiplier >= 1f) return;
@@ -39,8 +37,7 @@ namespace TownOfRoles.Roles.Underdog
             {
                 if (player == null || player.Data == null || player.Data.IsDead) continue;
                 if (!IsUnderdog(player)) continue;
-                // Clamp only when the game has set a fresh cooldown above ours, so
-                // we never fight the kill button's own countdown animation.
+
                 if (player.killTimer > reduced + 0.05f)
                 {
                     try { player.RpcSetKillTimer(reduced); } catch { }

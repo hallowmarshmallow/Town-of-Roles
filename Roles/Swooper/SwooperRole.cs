@@ -4,8 +4,6 @@ using TownOfRoles.Core;
 
 namespace TownOfRoles.Roles.Swooper
 {
-    // Swooper, an Impostor who can become temporarily invisible. Ported from the original
-    // Town-Of-Us Swooper role.
     internal sealed class SwooperRole : CustomImpostorRole
     {
         public const string Id = "townofroles.Swooper";

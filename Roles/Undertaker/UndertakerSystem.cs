@@ -1,20 +1,19 @@
 using System;
 using System.Collections.Generic;
-using ClassicUs.Reactor;
+using Atomic;
 using MarshAPI;
 using UnityEngine;
 using TownOfRoles.Core;
 
 namespace TownOfRoles.Roles.Undertaker
 {
-    // Undertaker gameplay logic (ported from Town-Of-Us' Undertaker.cs).
     internal static class UndertakerSystem
     {
         private const string DragRpc = "townofroles.UndertakerDrag";
         private const string DropRpc = "townofroles.UndertakerDrop";
         private const string RequestDragRpc = "townofroles.UndertakerRequestDrag";
 
-        private static readonly Dictionary<byte, byte> Dragged = new(); // draggerId -> bodyParentId (all clients)
+        private static readonly Dictionary<byte, byte> Dragged = new();
         private static readonly Dictionary<byte, DateTime> Cooldowns = new();
 
         public static bool IsUndertaker(PlayerControl player) =>
@@ -25,7 +24,7 @@ namespace TownOfRoles.Roles.Undertaker
         internal static bool CanDragNow(PlayerControl undertaker)
         {
             if (!IsUndertaker(undertaker) || undertaker.Data == null || undertaker.Data.IsDead) return false;
-            if (IsDragging(undertaker.PlayerId)) return true; // pressing again drops
+            if (IsDragging(undertaker.PlayerId)) return true;
             return DateTime.UtcNow >= GetCooldown(undertaker.PlayerId) && FindClosestBody(undertaker) != null;
         }
 
@@ -59,7 +58,6 @@ namespace TownOfRoles.Roles.Undertaker
             TownOfRolesRpcMux.Send(DropRpc, undertaker.PlayerId);
         }
 
-        // Runs every frame on every client: keep dragged bodies following the Undertaker.
         public static void Tick()
         {
             if (Dragged.Count == 0) return;
@@ -102,7 +100,7 @@ namespace TownOfRoles.Roles.Undertaker
             return best;
         }
 
-        [ReactorRpc(RequestDragRpc)]
+        [AtomicRpc(RequestDragRpc)]
         private static void OnRequestDrag(byte senderId, byte playerId)
         {
             var client = AmongUsClient.Instance;
@@ -119,7 +117,7 @@ namespace TownOfRoles.Roles.Undertaker
             }
         }
 
-        [ReactorRpc(DragRpc)]
+        [AtomicRpc(DragRpc)]
         private static void OnDrag(byte senderId, byte draggerId, byte bodyParentId)
         {
             var client = AmongUsClient.Instance;
@@ -127,7 +125,7 @@ namespace TownOfRoles.Roles.Undertaker
             Dragged[draggerId] = bodyParentId;
         }
 
-        [ReactorRpc(DropRpc)]
+        [AtomicRpc(DropRpc)]
         private static void OnDrop(byte senderId, byte draggerId)
         {
             var client = AmongUsClient.Instance;

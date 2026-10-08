@@ -34,15 +34,12 @@ using TownOfRoles.Roles.Miner;
 
 namespace TownOfRoles.Core
 {
-    // Wipes every role system's persistent state when the local player leaves a session.
     internal static class SessionReset
     {
         private static readonly List<Action> Resets = new List<Action>
         {
-            // Ability buttons/HUD + per-role cooldowns.
             () => MarshAPI.UiAbilityButtons.ResetAll(),
 
-            // Crewmate roles.
             SheriffAbilityHolder.Reset,
             SheriffSystem.Reset,
             JesterSystem.Reset,
@@ -56,7 +53,6 @@ namespace TownOfRoles.Core
             SnitchSystem.Reset,
             SpySystem.Reset,
 
-            // Impostor roles.
             JanitorSystem.Reset,
             MorphlingSystem.Reset,
             SwooperSystem.Reset,
@@ -66,14 +62,12 @@ namespace TownOfRoles.Core
             CamouflagerSystem.Reset,
             ShifterSystem.Reset,
 
-            // Neutrals.
             GlitchSystem.Reset,
             ArsonistSystem.Reset,
             SwapperSystem.Reset,
             PhantomSystem.Reset,
             TimeLordSystem.Reset,
 
-            // Cross-cutting systems.
             ModifierSystem.Reset,
             AssassinSystem.Reset,
             KillLog.Reset,
@@ -81,14 +75,12 @@ namespace TownOfRoles.Core
             VisualEffects.Reset,
         };
 
-        // Run every registered reset, isolating failures so one broken system can never prevent
-        // the others from clearing.
         internal static void ResetAll()
         {
             foreach (var reset in Resets)
             {
                 try { reset(); }
-                catch (Exception) { /* best effort by design */ }
+                catch (Exception) {   }
             }
         }
 

@@ -5,9 +5,6 @@ using UnityEngine;
 
 namespace TownOfRoles.Roles
 {
-    // MarshAPI adds virtual-role files to TaskAdderGame.TaskParent, but the stock insertion
-    // path keeps advancing one horizontal row. Reflow only role files after that insertion so
-    // they stay inside the folder and continue on rows.
     internal static class FreeplayRoleLayout
     {
         private const int Columns = 4;
@@ -21,7 +18,7 @@ namespace TownOfRoles.Roles
             var roleButtons = new List<Transform>();
             for (int i = 0; i < game.ActiveItems.Count; i++)
             {
-                var item = game.ActiveItems.get_Item(i);
+                var item = game.ActiveItems[i];
                 if (item == null) continue;
                 var button = item.GetComponent<TaskAddButton>();
                 if (button != null && button.IsRole) roleButtons.Add(item);
@@ -29,18 +26,12 @@ namespace TownOfRoles.Roles
 
             if (roleButtons.Count == 0) return;
 
-            // Sort role buttons by their current screen order before reflowing.
-            // This avoids using an arbitrary insertion order that can push items
-            // off the intended folder grid.
             roleButtons.Sort((a, b) =>
             {
                 var yCompare = b.localPosition.y.CompareTo(a.localPosition.y);
                 return yCompare != 0 ? yCompare : a.localPosition.x.CompareTo(b.localPosition.x);
             });
 
-            // Center the grid around the folder's existing role-button location.
-            // This preserves the game's canvas/camera setup while constraining every
-            // entry to four columns and as many visible rows as are needed.
             var origin = roleButtons[0].localPosition;
             origin.x -= ((Math.Min(Columns, roleButtons.Count) - 1) * ColumnSpacing) * 0.5f;
 
@@ -55,9 +46,6 @@ namespace TownOfRoles.Roles
                     target.localPosition.z);
             }
 
-            // The game sizes the folder scroller in ShowFolder (task folders) only; OpenRoleFolder
-            // lays out its rows without touching it, so the mod's lower rows land past the
-            // scrollable area. Mirror ShowFolder's own sizing call with the mod's grid geometry.
             var scroller = game.scroller;
             if (scroller != null)
             {

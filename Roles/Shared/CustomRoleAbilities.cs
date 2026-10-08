@@ -27,7 +27,6 @@ using TownOfRoles.Roles.Miner;
 
 namespace TownOfRoles.Roles
 {
-    // This mod's ability buttons: what each one means, and nothing else.
     internal static class CustomRoleAbilities
     {
         private static readonly EngineerButton Engineer = new();
@@ -50,9 +49,6 @@ namespace TownOfRoles.Roles
         private static readonly GlitchKillButton GlitchKill = new();
         private static readonly MinerButton Miner = new();
 
-        // Declaration order is slot order. A button's slot comes from its UiAbilityButton.Group
-        // as the registry sees them in this sequence, so reordering this array moves buttons on
-        // the HUD.
         private static readonly UiAbilityButton[] All = { Engineer, Medic, Seer, Sheriff, Vigilante, Janitor, Altruist, Arsonist, MorphlingSample, Morphling, Camouflager, Swooper, Undertaker, TimeLord, Shifter, GlitchMimic, GlitchHack, GlitchKill, Miner };
 
         private static readonly BepInEx.Logging.ManualLogSource Log =
@@ -60,7 +56,6 @@ namespace TownOfRoles.Roles
 
         private static bool _initialized;
 
-        // Hands the buttons to MarshAPI.
         internal static void Initialize()
         {
             if (_initialized) return;
@@ -71,16 +66,12 @@ namespace TownOfRoles.Roles
             UiAbilityButtons.NothingVisible += ShowNotFoundOnScreen;
         }
 
-        // Puts the "no buttons" report on screen once per round. A player reporting it is
-        // looking at the HUD, not at BepInEx/LogOutput.log, and the report is the whole reason
-        // the round line exists.
         private static void ShowNotFoundOnScreen(string message)
         {
             try { SystemChat.Show(message); }
             catch { }
         }
 
-        // The API's diagnostic report, for the /buttons command.
         internal static string DescribeButtons() => UiAbilityButtons.Report();
 
         private sealed class EngineerButton : UiAbilityButton
@@ -131,12 +122,10 @@ namespace TownOfRoles.Roles
         private sealed class SheriffButton : UiAbilityButton
         {
             protected override string Name => "Shoot";
-            protected override float Cooldown => Options.KillCooldown;
-            // The digits read the holder's own clock, not this button's local timer:
-            // the holder gates the shot, so it is the value the player must see.
+            protected override float Cooldown => SheriffOptions.KillCooldown;
+
             protected override float CooldownRemaining => SheriffAbilityHolder.SecondsRemaining;
-            // TOU's own kill artwork (Resources.Kill.png), what the Sheriff's
-            // button showed in Town-Of-Us, and what reads as "shoot" at a glance.
+
             protected override Sprite CreateIcon(Sprite original) => RoleArt.Kill ?? original;
             protected override bool IsVisible()
             {
@@ -219,9 +208,7 @@ namespace TownOfRoles.Roles
         {
             protected override string Name => "Sample";
             public override string Group => "Morphling";
-            // Sample and Morph share one cooldown in the system, so both buttons
-            // count the same clock down rather than one saying ready while the
-            // other gate still says no.
+
             protected override float CooldownRemaining => MorphlingSystem.SecondsRemaining(PlayerControl.LocalPlayer);
             protected override Sprite CreateIcon(Sprite original) => RoleArt.Sample ?? original;
             protected override bool IsVisible()
@@ -237,15 +224,13 @@ namespace TownOfRoles.Roles
         private sealed class MorphlingButton : UiAbilityButton
         {
             protected override string Name => "Morph";
-            // Shares the Morphling group, so this lands one slot above Sample.
+
             public override string Group => "Morphling";
             protected override float CooldownRemaining => MorphlingSystem.SecondsRemaining(PlayerControl.LocalPlayer);
-            // The shapeshift is a timed effect: green while it runs, then the white
-            // cooldown countdown for the rest of the wait.
+
             protected override float EffectRemaining => MorphlingSystem.ShiftSecondsRemaining(PlayerControl.LocalPlayer);
             protected override Sprite CreateIcon(Sprite original) => RoleArt.Morph ?? original;
 
-            // Morph has a narrower gate than "am I this role": no sample, no button.
             protected override string DescribeGate()
             {
                 var local = PlayerControl.LocalPlayer;
@@ -257,8 +242,7 @@ namespace TownOfRoles.Roles
             protected override bool IsVisible()
             {
                 var local = PlayerControl.LocalPlayer;
-                // Hidden until DNA has been sampled, no point showing a morph
-                // button that can never activate.
+
                 return local != null && local.Data != null && RoleConfig.Morphling?.Value == true &&
                        MorphlingSystem.IsMorphling(local) && !local.Data.IsDead &&
                        MorphlingSystem.HasSample(local);
@@ -288,7 +272,7 @@ namespace TownOfRoles.Roles
             protected override string Name => "Swoop";
             protected override Sprite CreateIcon(Sprite original) => RoleArt.Swoop ?? original;
             protected override float CooldownRemaining => SwooperSystem.SecondsRemaining(PlayerControl.LocalPlayer);
-            // Vanish time in green, then the rest of the swoop cooldown in white.
+
             protected override float EffectRemaining => SwooperSystem.VanishedSecondsRemaining(PlayerControl.LocalPlayer);
             protected override bool IsVisible()
             {
@@ -318,9 +302,7 @@ namespace TownOfRoles.Roles
         private sealed class UndertakerButton : UiAbilityButton
         {
             protected override float Cooldown => RoleConfig.Seconds(RoleConfig.UndertakerDragCooldown, 10f);
-            // Single toggle button: Drag picks up the nearest body, pressing
-            // again drops it (UndertakerSystem.CanDragNow returns true while
-            // dragging, and TryDrag drops when already dragging).
+
             protected override string Name => "Drag";
             protected override Sprite CreateIcon(Sprite original) => RoleArt.Drag ?? original;
             protected override bool IsVisible()
@@ -370,7 +352,7 @@ namespace TownOfRoles.Roles
             protected override string Name => "Hack";
             protected override float Cooldown => RoleConfig.Seconds(RoleConfig.GlitchHackCooldown, 30f);
             protected override float EffectRemaining => GlitchSystem.HackSecondsRemaining(PlayerControl.LocalPlayer);
-            // Shares the Glitch group: one slot above Mimic.
+
             public override string Group => "Glitch";
             protected override Sprite CreateIcon(Sprite original) => original;
             protected override bool IsVisible()
@@ -386,7 +368,7 @@ namespace TownOfRoles.Roles
         private sealed class GlitchKillButton : UiAbilityButton
         {
             protected override string Name => "Kill";
-            // Shares the Glitch group: two slots up from Mimic (second column).
+
             public override string Group => "Glitch";
             protected override float CooldownRemaining => GlitchSystem.SecondsUntilKillReady(PlayerControl.LocalPlayer);
             protected override Sprite CreateIcon(Sprite original) => RoleArt.Kill ?? original;
@@ -415,5 +397,4 @@ namespace TownOfRoles.Roles
             protected override void OnActivate() => MinerSystem.TryMine(PlayerControl.LocalPlayer);
         }
     }
-
 }

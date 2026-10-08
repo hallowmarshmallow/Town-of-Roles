@@ -4,13 +4,10 @@ using UnityEngine;
 
 namespace TownOfRoles.Core
 {
-    // The mod's own client tweaks that are neither a role setting nor a game rule.
     internal static class HorseModeConfig
     {
-        // Leave the game's seasonal horse mode alone (default: on).
         public static ConfigEntry<bool> HorseMode { get; private set; }
 
-        // True when the horse is left alone, which is the state the player sees.
         public static bool On => HorseMode?.Value != false;
 
         public static void Init(ConfigFile config)
@@ -22,18 +19,13 @@ namespace TownOfRoles.Core
         }
     }
 
-    // Forces seasonal horse mode off, or clears the override to let the game decide again.
     internal static class HorseMode
     {
         private static bool _applied;
         private static bool _loggedFailure;
 
-        // Applies the current config value. Safe to call when nothing changed.
         public static void Apply() => Set(HorseModeConfig.On);
 
-        // Forgets what was applied, so the next Apply re-asserts it. A round boundary calls
-        // this: the season is re-evaluated when the scene is rebuilt, and a remembered "already
-        // applied" would leave the override cleared.
         public static void Reset() => _applied = false;
 
         private static void Set(bool on)

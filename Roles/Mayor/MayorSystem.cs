@@ -7,7 +7,6 @@ using TownOfRoles.Core;
 
 namespace TownOfRoles.Roles.Mayor
 {
-    // Mayor gameplay logic (ported from Town-Of-Us' Mayor.cs).
     internal static class MayorSystem
     {
         public static bool IsMayor(PlayerControl player) =>
@@ -16,7 +15,6 @@ namespace TownOfRoles.Roles.Mayor
         public static int VoteBank => Mathf.Clamp(RoleConfig.Count(RoleConfig.MayorVoteBank, 2), 1, 15);
     }
 
-    // "CalculateVotes" is private; the string form survives interop drift across game updates.
     [HarmonyPatch(typeof(MeetingHud), "CalculateVotes")]
     internal static class MeetingHud_CalculateVotes_MayorPatch
     {
@@ -24,12 +22,9 @@ namespace TownOfRoles.Roles.Mayor
         {
             try
             {
-                // The vote tally is computed host-side (the host broadcasts the
-                // result via RpcVotingComplete); guard anyway so a client that
-                // ever runs CalculateVotes can never double-count votes.
                 var client = AmongUsClient.Instance;
                 if (client == null || !client.AmHost) return;
-                // playerStates is private in the 2026.8.9 interop.
+
                 var states = GameReflection.GetPlayerStates(__instance);
                 if (__instance == null || states == null || __result == null) return;
                 var extra = MayorSystem.VoteBank - 1;
@@ -39,15 +34,13 @@ namespace TownOfRoles.Roles.Mayor
                 {
                     var area = states[i];
                     if (area == null || !area.DidVote) continue;
-                    // 253 = VoteSkip in this build, 254 = no vote cast; anything
-                    // else is the voted index.
+
                     if (area.VotedFor == 253 || area.VotedFor == 254) continue;
                     if (area.VotedFor >= __result.Length) continue;
 
                     var voter = FindPlayer(area.TargetPlayerId);
                     if (voter == null || voter.Data == null || !MayorSystem.IsMayor(voter)) continue;
 
-                    // Cap so an absurdly high vote bank cannot overflow a byte tally.
                     __result[area.VotedFor] = (byte)Mathf.Min(255, (int)__result[area.VotedFor] + extra);
                 }
             }
@@ -65,8 +58,6 @@ namespace TownOfRoles.Roles.Mayor
         }
     }
 
-    // The Mayor's Abstain button, built into the meeting HUD with the same delegate-free
-    // UiRuntime wiring as the Assassin meeting buttons.
     internal static class MayorAbstainUi
     {
         private static GameObject _button;
@@ -76,15 +67,13 @@ namespace TownOfRoles.Roles.Mayor
             if (meeting == null) return;
             var mayor = PlayerControl.LocalPlayer;
             if (!MayorSystem.IsMayor(mayor) || mayor.Data == null || mayor.Data.IsDead) return;
-            if (_button != null) return; // already built this meeting
+            if (_button != null) return;
 
             try
             {
                 var hud = HudManager.Instance;
                 if (hud == null || hud.KillButton == null) return;
-                // Chrome mode: the drawn and clickable parts survive, the prefab's
-                // AspectPosition does not (this button is placed relative to the
-                // meeting HUD, not to a screen edge).
+
                 var clone = UiClone.Clone(hud.KillButton.gameObject, hud.transform, new UiCloneOptions
                 {
                     Name = "TownOfRoles_MayorAbstain",
@@ -93,7 +82,6 @@ namespace TownOfRoles.Roles.Mayor
 
                 if (clone == null) return;
 
-                // Keep the round button background, hide the kill icon.
                 var background = clone.GetComponent<SpriteRenderer>();
                 if (background == null || background.sprite == null)
                 {
@@ -113,7 +101,6 @@ namespace TownOfRoles.Roles.Mayor
                     sr.sortingOrder = 120;
                 }
 
-                // Position above the skip button (bottom-right of the meeting).
                 clone.transform.localScale = Vector3.one * 0.9f;
                 clone.transform.SetParent(meeting.transform, false);
                 clone.transform.localPosition = new Vector3(3.4f, 2.6f, -30f);
@@ -145,7 +132,7 @@ namespace TownOfRoles.Roles.Mayor
             var local = PlayerControl.LocalPlayer;
             var meeting = MeetingHud.Instance;
             if (local == null || meeting == null) return;
-            // 253 = VoteSkip in this build (matches SkipVoteButton.TargetPlayerId).
+
             meeting.CmdCastVote(local.PlayerId, 253);
             TryDestroy();
         }

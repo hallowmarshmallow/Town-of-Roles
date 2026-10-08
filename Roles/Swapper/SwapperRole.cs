@@ -4,8 +4,6 @@ using TownOfRoles.Core;
 
 namespace TownOfRoles.Roles.Swapper
 {
-    // Swapper, a Crewmate who can swap the votes of two players in a meeting. Ported from the
-    // original Town-Of-Us Swapper role.
     internal sealed class SwapperRole : CustomCrewmateRole
     {
         public const string Id = "townofroles.Swapper";
@@ -16,7 +14,7 @@ namespace TownOfRoles.Roles.Swapper
         public override int Count => RoleConfig.Count(RoleConfig.SwapperCount);
         public override float RoleChancePercent => RoleConfig.Chance(RoleConfig.SwapperChance);
         public override string DescriptionShort => "Use the Swap buttons in a meeting to pick two players; their votes are swapped.";
-        // Swapper uses meeting buttons, not the native Kill button.
+
         public override string KillAbilityName => string.Empty;
         public override Color TeamColor => new(0.45f, 0.8f, 0.3f, 1f);
     }

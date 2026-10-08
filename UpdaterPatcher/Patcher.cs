@@ -7,8 +7,7 @@ using BepInEx.Preloader.Core.Patching;
 
 namespace TownOfRoles.Updater.Patcher
 {
-    // Preloader patcher that applies staged Town Of Roles updates BEFORE the chainloader loads
-    // any plugin assembly.
+
     [PatcherPluginInfo("townofroles.updater.patcher", "Town Of Roles Updater", "1.0.0")]
     public class TownOfRolesUpdaterPatcher : BasePatcher
     {
@@ -32,7 +31,7 @@ namespace TownOfRoles.Updater.Patcher
             string stagingDir = Path.Combine(Paths.PluginPath, StagingDirName);
             string pendingPath = Path.Combine(stagingDir, PendingFileName);
             if (!File.Exists(pendingPath))
-                return; // nothing staged
+                return;
 
             var pending = ReadPending(pendingPath);
             if (pending == null)
@@ -70,11 +69,9 @@ namespace TownOfRoles.Updater.Patcher
                 }
             }
 
-            // Copy (not move) so the staged file remains until we know the copy succeeded.
             File.Copy(stagedPath, targetPath, true);
             Log.LogInfo("TownOfRoles: applied update to " + targetName + " (version " + (pending.Version ?? "?") + ")");
 
-            // Clean up staging.
             TryDelete(pendingPath);
             TryDelete(stagedPath);
             try
@@ -106,8 +103,7 @@ namespace TownOfRoles.Updater.Patcher
 
         private static string GetJsonString(string json, string key)
         {
-            // Tiny extractor for the fixed pending.json shape ("key":"value").
-            // No JSON dependency is pulled into the preloader on purpose.
+
             string needle = "\"" + key + "\"";
             int start = json.IndexOf(needle, StringComparison.Ordinal);
             if (start < 0) return null;

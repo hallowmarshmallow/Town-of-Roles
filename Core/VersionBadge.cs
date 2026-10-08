@@ -2,7 +2,8 @@ using System;
 using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
-using ClassicUs.Reactor;
+using System.Text;
+using Atomic;
 using HarmonyLib;
 using MarshAPI;
 using TMPro;
@@ -10,91 +11,155 @@ using UnityEngine;
 
 namespace TownOfRoles.Core
 {
-    // Shows the mod's version line directly below the game's version text in the top-left
-    // corner (the "2026.9.10" readout on the main menu), the same line plus the author credit
-    // above the ping/fps readout in game, and a second line naming the versions of everything
-    // the mod is actually running on.
     internal static class VersionBadge
     {
         private const string BadgeName = "TownOfRolesVersionBadge";
 
         private const string StackBadgeName = "TownOfRolesStackBadge";
 
-        // The mod's name, spelled once.
         internal const string Product = "Town Of Roles";
 
-        // The badge line: name, version, release tag. Named rather than inlined so the menu
-        // badge and the in-game credit cannot disagree about the wording, which is why it is
-        // reachable from both.
         internal static string Badge() => Product + " " + TownOfRolesPlugin.Version + " (Beta)";
 
-        // The stack line: the version of everything the mod actually runs on, plus the build
-        // revision, the second badge row on the main menu.
         internal static string StackBadge() =>
-            "BepInEx " + BepInExVersion() +
-            " | Reactor " + ReactorPlugin.Version +
-            " | MarshAPI " + MarshAPIPlugin.Version +
-            " | " + Revision();
+            "Atomic " + AtomicPlugin.Version + " | MarshAPI " + MarshAPIPlugin.Version;
 
-        // The build revision, as r&lt;8 hex&gt;, or runknown for a build the SDK could not
-        // stamp one onto (no git in PATH, or a source archive with no repository behind it).
-        internal static string Revision()
-        {
-            try
-            {
-                var informational = Assembly.GetExecutingAssembly()
-                    .GetCustomAttributes(typeof(AssemblyInformationalVersionAttribute), false)
-                    .OfType<AssemblyInformationalVersionAttribute>()
-                    .FirstOrDefault()
-                    ?.InformationalVersion;
-
-                int plus = informational == null ? -1 : informational.IndexOf('+');
-                if (plus < 0 || plus + 1 >= informational.Length) return "runknown";
-
-                var commit = informational.Substring(plus + 1).Trim();
-                if (commit.Length > 8) commit = commit.Substring(0, 8);
-
-                return commit.Length == 0 ? "runknown" : "r" + commit;
-            }
-            catch
-            {
-                return "runknown";
-            }
-        }
-
-        // BepInEx's own version.
-        internal static string BepInExVersion()
+        // Everything BepInEx.Core says about itself, like "6.0.0-be.788+5b766a3b7f6c".
+        private static string BepInExProductVersion()
         {
             try
             {
                 var assembly = typeof(TownOfRolesPlugin).BaseType?.Assembly;
-                if (assembly == null) return "?";
+                if (assembly == null) return null;
 
                 var info = FileVersionInfo.GetVersionInfo(assembly.Location);
-                string raw = !string.IsNullOrEmpty(info.ProductVersion)
-                    ? info.ProductVersion
-                    : !string.IsNullOrEmpty(info.FileVersion) ? info.FileVersion : null;
-
-                if (raw != null)
-                {
-                    int plus = raw.IndexOf('+');
-                    return plus > 0 ? raw.Substring(0, plus) : raw;
-                }
+                if (!string.IsNullOrEmpty(info.ProductVersion)) return info.ProductVersion;
+                if (!string.IsNullOrEmpty(info.FileVersion)) return info.FileVersion;
 
                 var version = assembly.GetName().Version;
-                return version == null ? "?" : version.ToString();
+                return version == null ? null : version.ToString();
             }
             catch
             {
-                return "?";
+                return null;
             }
+        }
+
+        // "6.0.0-be.788" becomes "6+788".
+        internal static string BepInExVersion()
+        {
+            string raw = BepInExProductVersion();
+            if (string.IsNullOrEmpty(raw)) return "?";
+
+            int plus = raw.IndexOf('+');
+            string version = plus > 0 ? raw.Substring(0, plus) : raw;
+
+            int be = version.IndexOf("-be.");
+            int dot = version.IndexOf('.');
+            if (be > 0 && dot > 0) return version.Substring(0, dot) + "+" + version.Substring(be + 4);
+
+            return version;
+        }
+
+        // The part after the '+', cut down to 7 characters.
+        private static string BepInExCommit()
+        {
+            string raw = BepInExProductVersion();
+            if (string.IsNullOrEmpty(raw)) return null;
+
+            int plus = raw.IndexOf('+');
+            if (plus < 0 || plus + 1 >= raw.Length) return null;
+
+            string commit = raw.Substring(plus + 1).Trim();
+            if (commit.Length == 0) return null;
+            return commit.Length > 7 ? commit.Substring(0, 7) : commit;
+        }
+
+        internal static string BepInExLine()
+        {
+            string commit = BepInExCommit();
+            return "BepInEx " + BepInExVersion() + (string.IsNullOrEmpty(commit) ? "" : " (" + commit + ")");
+        }
+
+        // The game's own line is "v2026.9.20". Put the BepInEx build right after it.
+        private static void SitNextToGameVersion(TextMeshPro text)
+        {
+            if (text == null) return;
+
+            string raw;
+            try { raw = text.text; }
+            catch { return; }
+
+            if (string.IsNullOrEmpty(raw) || raw.Contains("BepInEx ")) return;
+
+            string tag = "<color=#8C93A8>" + BepInExLine() + "</color>";
+            string[] lines = raw.Split('\n');
+
+            int at = -1;
+            for (int i = 0; i < lines.Length; i++)
+            {
+                if (IsVersionLine(lines[i])) { at = i; break; }
+            }
+
+            if (at >= 0)
+            {
+                lines[at] = lines[at].TrimEnd('\r') + "  " + tag;
+            }
+            else
+            {
+                string[] bigger = new string[lines.Length + 1];
+                bigger[0] = tag;
+                Array.Copy(lines, 0, bigger, 1, lines.Length);
+                lines = bigger;
+            }
+
+            text.text = string.Join("\n", lines);
+            text.ForceMeshUpdate(false, false);
+        }
+
+        // A line holding nothing but a version, like "v2026.9.20", tags stripped.
+        private static bool IsVersionLine(string line)
+        {
+            if (string.IsNullOrEmpty(line)) return false;
+
+            string plain = StripTags(line).Trim();
+            if (plain.Length == 0) return false;
+
+            int dots = 0;
+            int digits = 0;
+            for (int i = 0; i < plain.Length; i++)
+            {
+                char c = plain[i];
+                if (c >= '0' && c <= '9') { digits++; continue; }
+                if (c == '.' || c == 'v') { dots++; continue; }
+                if (c == ' ') continue;
+                return false;
+            }
+
+            return digits >= 3 && dots >= 2;
+        }
+
+        private static string StripTags(string line)
+        {
+            var sb = new StringBuilder(line.Length);
+            bool inside = false;
+
+            for (int i = 0; i < line.Length; i++)
+            {
+                char c = line[i];
+                if (c == '<') { inside = true; continue; }
+                if (c == '>') { inside = false; continue; }
+                if (!inside) sb.Append(c);
+            }
+
+            return sb.ToString();
         }
 
         public static void Ensure(VersionShower shower)
         {
-            // AddVersionLine is idempotent by name, which is what the old "already placed"
-            // check was for, so a second line is a second name rather than a second check.
             var text = shower == null ? null : shower.text;
+
+            SitNextToGameVersion(text);
 
             MarshAPI.ModBadgeAPI.AddVersionLine(text, BadgeName, Badge(), new Color(0.45f, 0.85f, 1f));
             MarshAPI.ModBadgeAPI.AddVersionLine(text, StackBadgeName, StackBadge(), new Color(0.62f, 0.66f, 0.74f));
@@ -117,9 +182,6 @@ namespace TownOfRoles.Core
         }
     }
 
-    // In-game credit line. Each frame the PingTracker rewrites the ping/fps text, so this
-    // postfix prepends the mod stack ("Town Of Roles" + "by hallowmarsh") on top of it,
-    // directly above the ping and fps labels in the lobby/HUD.
     [HarmonyPatch(typeof(PingTracker), nameof(PingTracker.Update))]
     internal static class PingTracker_Update_CreditPatch
     {

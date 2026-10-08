@@ -4,8 +4,6 @@ using TownOfRoles.Core;
 
 namespace TownOfRoles.Roles.Camouflager
 {
-    // Camouflager, an Impostor who can turn everyone grey to hide identities. Ported from the
-    // original Town-Of-Us Camouflager role.
     internal sealed class CamouflagerRole : CustomImpostorRole
     {
         public const string Id = "townofroles.Camouflager";

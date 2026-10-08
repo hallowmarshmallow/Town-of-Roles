@@ -7,7 +7,6 @@ using UnityEngine;
 
 namespace TownOfRoles.Core
 {
-    // Town Of Roles role-settings tabs shown when the lobby game-config menu opens.
     internal static class GameConfigOverlay
     {
         private static readonly Color CrewColor = new(0.35f, 0.8f, 1f, 1f);
@@ -70,14 +69,12 @@ namespace TownOfRoles.Core
 
         public static bool IsVisible => _root != null && _root && _root.activeSelf;
 
-        // Called from the menu hooks when the lobby config screen opens.
         public static void OnConfigOpened(object menu)
         {
             try
             {
                 if (RoleConfig.GameConfigOverlay?.Value == false) return;
-                // Never show both surfaces at once: the native rows are the
-                // supported one, so the overlay stands down while they are on.
+
                 if (RoleConfig.NativeMenuRows?.Value == true) return;
                 ShowCore(menu);
             }
@@ -91,7 +88,7 @@ namespace TownOfRoles.Core
         private static void ShowCore(object menu)
         {
             if (!HudManager.InstanceExists) return;
-            if (LobbyBehaviour.Instance == null) return; // only show in a lobby
+            if (LobbyBehaviour.Instance == null) return;
             if (IsVisible) return;
 
             _trackedMenu = menu as Component;
@@ -103,7 +100,6 @@ namespace TownOfRoles.Core
             _root.SetActive(true);
         }
 
-        // Called from the HudManager.Update patch; closes with the menu.
         public static void Poll()
         {
             try
@@ -126,7 +122,6 @@ namespace TownOfRoles.Core
             catch { }
         }
 
-        // Rendering
         private static void EnsureCreated(HudManager hud)
         {
             if (_root != null && _root) return;
@@ -135,7 +130,6 @@ namespace TownOfRoles.Core
             _root.transform.SetParent(hud.transform, false);
             _root.transform.localPosition = Vector3.zero;
 
-            // Fullscreen click-blocking backdrop (the game's own FullScreen quad).
             GameObject src = null;
             if (hud.FullScreen != null)
             {
@@ -143,17 +137,11 @@ namespace TownOfRoles.Core
                 if (comp != null) src = comp.gameObject;
             }
 
-            // The backdrop is the game's own full-screen quad with every MonoBehaviour
-            // stripped. Its SpriteRenderer and Collider2D are Components, not MonoBehaviours, so
-            // both survive, and the collider is what blocks clicks reaching the native menu
-            // underneath.
             GameObject backdrop = null;
             if (src != null)
                 backdrop = UiClone.Clone(src, _root.transform,
                     new UiCloneOptions { Name = "ToU_Backdrop", Mode = UiCloneMode.Backdrop }).Root;
 
-            // No full-screen quad to clone, or the clone failed: build the minimum
-            // the rest of this method needs.
             if (backdrop == null)
             {
                 backdrop = new GameObject("ToU_Backdrop");
@@ -162,8 +150,7 @@ namespace TownOfRoles.Core
                 var bc = backdrop.AddComponent<BoxCollider2D>();
                 bc.size = new Vector2(12f, 7f);
             }
-            // One unit behind our buttons/text (z=0) so the collider blocks the
-            // native menu underneath without swallowing clicks meant for us.
+
             backdrop.transform.localPosition = new Vector3(0f, 0f, -1f);
             var renderer = backdrop.GetComponent<SpriteRenderer>();
             if (renderer != null)
@@ -172,7 +159,6 @@ namespace TownOfRoles.Core
                 renderer.sortingOrder = 100;
             }
 
-            // A collider guarantees the native menu behind cannot be clicked.
             if (backdrop.GetComponent<Collider2D>() == null)
             {
                 var box = backdrop.AddComponent<BoxCollider2D>();
@@ -186,9 +172,6 @@ namespace TownOfRoles.Core
                 _material = hud.GameSettingsTMP.fontSharedMaterial;
             }
 
-            // Window chrome: a rounded card behind every control plus an accent
-            // rule under the title, so the overlay reads as a real dialog
-            // instead of text floating on the black backdrop.
             UiKit.MakePanel(_root.transform, "ToU_Window", new Vector3(0f, -0.15f, 0f), 9.6f, 6.3f, UiKit.PanelBg, 102);
             UiKit.MakeDivider(_root.transform, "ToU_TitleRule", 2.3f, 8.8f);
 
@@ -208,8 +191,6 @@ namespace TownOfRoles.Core
                     ? "Editing role pool (host) — press Done to close"
                     : "Role settings synced from host — read only";
 
-            // Tabs: the active one lights up in the mod accent, inactive stay
-            // as muted chips.
             MakeButton("TabCrewmate", "Crewmate", new Vector3(-3f, 1.55f, 0f), 1.5f, 1.8f, () => SetTab(0), _tab == 0, _tab == 0 ? UiKit.AccentCyan : (Color?)null);
             MakeButton("TabImpostor", "Impostor", new Vector3(-1f, 1.55f, 0f), 1.5f, 1.8f, () => SetTab(1), _tab == 1, _tab == 1 ? UiKit.AccentCyan : (Color?)null);
             MakeButton("TabNeutral", "Neutral", new Vector3(1f, 1.55f, 0f), 1.5f, 1.8f, () => SetTab(2), _tab == 2, _tab == 2 ? UiKit.AccentCyan : (Color?)null);
@@ -231,7 +212,6 @@ namespace TownOfRoles.Core
                 }
             }
 
-            // Primary action: the Done button carries the positive accent.
             MakeButton("Done", "Done", new Vector3(0f, -2.7f, 0f), 1.1f, 2.4f, Hide, true, UiKit.GoodGreen);
         }
 
@@ -340,8 +320,6 @@ namespace TownOfRoles.Core
             return y - 0.45f;
         }
 
-        // Faint full-width highlight behind one row of controls, separates rows visually
-        // without alternating stripes.
         private static void AddRowStrip(string key, float y)
         {
             var strip = UiKit.MakePanel(_root.transform, "ToU_Strip_" + key.Replace(".", "_"),
@@ -351,7 +329,6 @@ namespace TownOfRoles.Core
 
         private static readonly Color RowStrip = new(1f, 1f, 1f, 0.035f);
 
-        // Cycles two-option string settings (Faction/Role, Jester/Crewmate).
         private static string CycleString(string current)
         {
             if (current == "Faction") return "Role";
@@ -374,15 +351,8 @@ namespace TownOfRoles.Core
             Render();
         }
 
-        // Primitives (UpdateModal proven)
         private static TextMeshPro MakeText(string name, string text, Vector3 pos, float fontSize, Color color, int sort, bool persistent = false)
         {
-            // The label is cloned from the game's own world-space TMP (UiClone.CloneText): a
-            // freshly added one keeps its native font size (36) and ignores a fontSize set
-            // before it is awake. This method only says what the label reads like.
-            // Unity-null, not managed-null: the cached font and material can have been
-            // destroyed since the overlay was built, and handing a dead one to CloneText as a
-            // fallback would poison the fresh label.
             if (_font != null && !_font) _font = null;
             if (_material != null && !_material) _material = null;
 
@@ -409,10 +379,6 @@ namespace TownOfRoles.Core
             var hud = HudManager.Instance;
             if (hud == null || hud.KillButton == null) return null;
 
-            // Chrome rather than VisualOnly: this button is placed by hand inside
-            // the overlay card, so the prefab's AspectPosition has to go, left
-            // alive it would drag the button back to the Kill button's screen edge
-            // on its next Update.
             var clone = UiClone.Clone(hud.KillButton.gameObject, _root.transform, new UiCloneOptions
             {
                 Name = "ToU_Btn_" + id,
@@ -421,9 +387,6 @@ namespace TownOfRoles.Core
 
             if (clone == null) return null;
 
-            // The KillButton clone carries the kill icon and cooldown overlay sprites as well as
-            // the round button background, so keep only the background: prefer the root-level
-            // SpriteRenderer (KillButtonManager.renderer), falling back to the largest sprite.
             SpriteRenderer background = clone.GetComponent<SpriteRenderer>();
             if (background == null || background.sprite == null)
             {
@@ -459,11 +422,6 @@ namespace TownOfRoles.Core
                 tmp.sortingOrder = 120;
             }
 
-            // Delegate-free click dispatch (see UiRuntime): the native pipeline calls
-            // PassiveButton.ReceiveClickDown for every collider under the mouse, so this button's
-            // PassiveButton GameObject is named with the unique id and the UiRuntime prefix routes
-            // the click. OnClick is left alone, because marshalling a managed UnityAction
-            // triggers the game's protection.
             var passive = clone.GetComponentInChildren<PassiveButton>(true);
             if (passive != null && onClick != null)
             {
@@ -492,9 +450,6 @@ namespace TownOfRoles.Core
             BepInEx.Logging.Logger.CreateLogSource("TownOfRoles").LogWarning("Config overlay: " + message);
     }
 
-    // NOTE: SettingMenu has no "Start" on Classic Us 8.9 (patched "Start" there
-    // throws at plugin load). OnEnable fires every time the menu becomes active,
-    // which is exactly when the overlay should appear.
     [HarmonyPatch(typeof(SettingMenu), nameof(SettingMenu.OnEnable))]
     internal static class SettingMenu_OnEnable_ConfigOverlayPatch
     {
@@ -506,12 +461,6 @@ namespace TownOfRoles.Core
     {
         private static void Postfix(GameSettingMenu __instance) => GameConfigOverlay.OnConfigOpened(__instance);
     }
-
-    // The old GameOptionsMenu.OnEnable trigger is gone on purpose: resolving any
-    // patch on GameOptionsMenu forces its class init, which terminates the
-    // 2026.9.10 load (crash-reports/). SettingMenu.OnEnable already fires for the
-    // same event, SettingMenu.menu is the GameOptionsMenu, so the parent waking
-    // covers the child.
 
     [HarmonyPatch(typeof(HudManager), nameof(HudManager.Update))]
     internal static class HudManager_Update_ConfigOverlayPatch

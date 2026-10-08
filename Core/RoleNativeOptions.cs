@@ -5,10 +5,8 @@ using MarshAPI;
 
 namespace TownOfRoles.Core
 {
-    // Bridges the mod's role settings onto the game's own role-option page.
     internal static class RoleNativeOptions
     {
-        // Declares role's native options.
         public static void Declare(CustomRole role, RoleOptionBuilder options)
         {
             if (role == null || options == null) return;
@@ -18,8 +16,6 @@ namespace TownOfRoles.Core
                 var key = RoleCatalog.KeyOfId(role.RoleTypeName);
                 if (key == null)
                 {
-                    // Not a catalog role: an external mod's descriptor. It has no
-                    // channels, so it declares its own options in its own override.
                     return;
                 }
 
@@ -30,9 +26,6 @@ namespace TownOfRoles.Core
             }
             catch (Exception e)
             {
-                // A declaration failure must not stop the role from registering; the
-                // builder throws on a malformed option precisely so it is caught here
-                // rather than inside the game's menu build.
                 Log("declare for " + role.RoleTypeName + ": " + e.Message);
             }
         }
@@ -42,8 +35,6 @@ namespace TownOfRoles.Core
         {
             var channelName = roleKey + "." + spec.Field;
 
-            // False means "no native equivalent": either there is no such channel, or
-            // it is a string setting. Either way it stays where it is.
             if (!RoleSettingsSync.TryDescribe(channelName, out var kind, out var min, out var max, out var current))
                 return;
 
@@ -61,13 +52,8 @@ namespace TownOfRoles.Core
             }
         }
 
-        // The native row's step per click.
         private static float StepFor(float min, float max) => (max - min) < 10f ? 0.1f : 1f;
 
-        // mod -> native
-
-        // Writes one channel's value into the game's option store, so a change made on the
-        // mod's own row is visible to the native page too.
         public static void PushChannel(string channelName)
         {
             if (!NativeRoleOptions.Enabled) return;
@@ -102,11 +88,8 @@ namespace TownOfRoles.Core
             return true;
         }
 
-        // native -> mod
-
         private static int _pullFailures;
 
-        // Copies every registered role's native option values back into the mod's channels.
         internal static void PullFromNative()
         {
             if (!NativeRoleOptions.Enabled) return;
@@ -144,8 +127,6 @@ namespace TownOfRoles.Core
             BepInEx.Logging.Logger.CreateLogSource("TownOfRoles").LogError("Role native options: " + message);
     }
 
-    // The host's option set has just been applied to the local role objects: mirror it into the
-    // mod's channels, which is what gameplay actually reads.
     [HarmonyPatch(typeof(RoleOptionsManager), nameof(RoleOptionsManager.ReadJson))]
     internal static class RoleOptionsManager_ReadJson_NativeOptionsPatch
     {
@@ -156,7 +137,6 @@ namespace TownOfRoles.Core
         }
     }
 
-    // A native role-option row was clicked on this client.
     [HarmonyPatch(typeof(RoleSettingGameOption), nameof(RoleSettingGameOption.ChangeRoleOption))]
     internal static class RoleSettingGameOption_ChangeRoleOption_NativeOptionsPatch
     {

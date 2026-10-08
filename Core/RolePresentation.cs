@@ -24,8 +24,7 @@ namespace TownOfRoles.Core
             foreach (var def in RoleCatalog.All)
             {
                 if (!RoleRegistry.IsAssigned(player, def.Id)) continue;
-                // A converted Executioner (target died) is a plain Crewmate or a
-                // Jester, never still an Executioner.
+
                 if (def.Id == "townofroles.Executioner" && ExecutionerSystem.IsConverted(player))
                     return false;
                 name = def.Name;
@@ -39,8 +38,7 @@ namespace TownOfRoles.Core
         {
             if (viewer == null || target == null || target.Data == null) return false;
             if (viewer == target) return true;
-            // Lovers always recognise each other (upstream's ColourChange painted
-            // both names pink for the pair regardless of team or death).
+
             if (LoverSystem.ArePartners(viewer, target)) return true;
             if (viewer.Data.IsDead) return RoleConfig.DeadSeeRoles?.Value == true;
             return RoleConfig.ImpostorSeeRoles?.Value == true && viewer.Data.myRole != null && target.Data.myRole != null &&

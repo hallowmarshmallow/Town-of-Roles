@@ -1,13 +1,12 @@
 using System;
 using System.Collections.Generic;
-using ClassicUs.Reactor;
+using Atomic;
 using MarshAPI;
 using UnityEngine;
 using TownOfRoles.Core;
 
 namespace TownOfRoles.Roles.Spy
 {
-    // Spy gameplay logic (ported from Town-Of-Us' Spy.cs).
     internal static class SpySystem
     {
         private const string IntelRpc = "townofroles.SpyIntel";
@@ -21,7 +20,6 @@ namespace TownOfRoles.Roles.Spy
         public static bool IsSpy(PlayerControl player) =>
             player != null && player.Data != null && RoleRegistry.IsAssigned(player, SpyRole.Id);
 
-        // Called by the Arsonist when a player gets doused.
         public static void OnPlayerDoused(byte playerId)
         {
             if (!AnySpy()) return;
@@ -66,13 +64,13 @@ namespace TownOfRoles.Roles.Spy
         {
             try { TownOfRolesRpcMux.Send(IntelRpc, kind, playerId); }
             catch (Exception e) { BepInEx.Logging.Logger.CreateLogSource("TownOfRoles").LogError("Spy intel: " + e.Message); }
-            // Only surface the intel locally if the host is actually a Spy.
+
             var local = PlayerControl.LocalPlayer;
             if (local == null || local.Data == null || !IsSpy(local) || local.Data.IsDead) return;
             ShowIntel(kind);
         }
 
-        [ReactorRpc(IntelRpc)]
+        [AtomicRpc(IntelRpc)]
         private static void OnIntel(byte senderId, byte kind, byte playerId)
         {
             var client = AmongUsClient.Instance;
@@ -108,5 +106,4 @@ namespace TownOfRoles.Roles.Spy
         public static void OnGameStarted(GameStartedEventArgs _) => Reset();
         public static void OnGameEnded(GameEndedEventArgs _) => Reset();
     }
-
 }

@@ -4,8 +4,6 @@ using TownOfRoles.Core;
 
 namespace TownOfRoles.Roles.Glitch
 {
-    // The Glitch, a Neutral Killing role with Mimic, Hack, and Kill abilities. Wins when
-    // everyone else is dead.
     internal sealed class GlitchRole : CustomRole
     {
         public const string Id = "townofroles.Glitch";

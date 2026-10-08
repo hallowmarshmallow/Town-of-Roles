@@ -4,7 +4,6 @@ using TownOfRoles.Core;
 
 namespace TownOfRoles.Roles.Jester
 {
-    // Jester, a Neutral role that wins when the lobby votes it out.
     internal sealed class JesterRole : CustomRole
     {
         public const string Id = "townofroles.Jester";

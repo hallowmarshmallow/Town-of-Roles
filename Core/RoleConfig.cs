@@ -7,9 +7,6 @@ using System.Reflection;
 
 namespace TownOfRoles.Core
 {
-    // BepInEx configuration for role registration, role-pool generation, and gameplay tuning.
-    // Role enable toggles, counts, chances, and gameplay values are grouped into stable BepInEx
-    // sections rather than the native game menu.
     internal static class RoleConfig
     {
         public static ConfigEntry<bool> Sheriff { get; private set; }
@@ -40,10 +37,8 @@ namespace TownOfRoles.Core
         public static ConfigEntry<bool> Miner { get; private set; }
         public static ConfigEntry<bool> Lovers { get; private set; }
 
-        // How many players may hold a custom Impostor role in one game.
         public static ConfigEntry<int> MaxImpostorRoles { get; private set; }
 
-        // How many players may hold a custom Neutral role in one game.
         public static ConfigEntry<int> MaxNeutralRoles { get; private set; }
 
         public static ConfigEntry<int> SheriffCount { get; private set; }
@@ -167,25 +162,18 @@ namespace TownOfRoles.Core
         public static ConfigEntry<bool> ModifierButtonBarry { get; private set; }
         public static ConfigEntry<float> ModifierButtonBarryProbability { get; private set; }
 
-        // Optional Sheriff kill/report hooks ([Gameplay] EnableGameplayHooks).
         public static ConfigEntry<bool> GameplayHooks { get; private set; }
         public static ConfigEntry<bool> CustomAbilityButtons { get; private set; }
         public static ConfigEntry<bool> GameConfigOverlay { get; private set; }
         public static ConfigEntry<bool> NativeMenuRows { get; private set; }
         public static ConfigEntry<bool> ModsMenu { get; private set; }
 
-        // Do the mod's asset and code warm-up on the splash screen ([Client]
-        // BootScreenPreload).
         public static ConfigEntry<bool> BootScreenPreload { get; private set; }
 
-        // Draws the mod's line on the boot screen.
         public static ConfigEntry<bool> BootScreenBadge { get; private set; }
 
         public static void Init(ConfigFile config)
         {
-            // Read the file before binding new definitions. BepInEx does not expose
-            // unbound/orphaned legacy entries through ConfigFile.Entries, so parsing
-            // the small INI surface is what preserves old users' settings reliably.
             var fileValues = ReadConfigFile(config);
 
             Sheriff = BindRoleToggle(config, "Crewmate Roles", "Sheriff", "Add the Sheriff to the role pool.");
@@ -271,10 +259,6 @@ namespace TownOfRoles.Core
             LoversCount = BindCount(config, "Neutral Roles", "LoversCount", 1, "Number of Lover pairs to assign per game. Each pair needs two Crewmates (plus an Impostor when enabled); 1 pair is the original Town-Of-Us behaviour.");
             LoversChance = BindChance(config, "Neutral Roles", "LoversChance", 100f, "Chance the Lovers pair is assigned at all.");
 
-            // Defaults below are aligned with upstream Town Of Us (master
-            // Generate.cs) so a fresh install behaves like the original mod.
-            // NOTE: an existing BepInEx config keeps its saved values, these
-            // only apply to new keys, or after deleting townofroles.cfg.
             SheriffKillCooldown = BindSeconds(config, "Crewmate Roles", "SheriffKillCooldown", 25f, "Seconds between Sheriff shots. Town-Of-Us default: 25.");
             SheriffKillOther = config.Bind("Crewmate Roles", "SheriffKillOther", false, "When Sheriff shoots a non-enemy, the target also dies. Town-Of-Us 'Sheriff Miskill Kills Crewmate' default: false (only the Sheriff dies).");
             SheriffBodyReport = config.Bind("Crewmate Roles", "SheriffBodyReport", true, "Allow the Sheriff to report bodies they shot themselves. Town-Of-Us default: true.");
@@ -299,7 +283,7 @@ namespace TownOfRoles.Core
             ArsonistDouseCooldown = BindSeconds(config, "Neutral Roles", "ArsonistDouseCooldown", 25f, "Seconds between Arsonist douses. Town-Of-Us default: 25.");
             ExecutionerConvertOnTargetDeath = config.Bind("Neutral Roles", "ExecutionerConvertOnTargetDeath", true, "When the Executioner's target dies without being voted out, convert the Executioner to another role.");
             ExecutionerConvertRole = config.Bind("Neutral Roles", "ExecutionerConvertRole", "Jester", "Role the Executioner becomes when their target dies: Jester or Crewmate.");
-            // Both defaults match upstream Town Of Us (TownOfUs.cs: BothLoversDie = true).
+
             LoversBothDie = config.Bind("Neutral Roles", "LoversBothDie", true, "When one Lover dies, the other dies too. Town-Of-Us 'Both Lovers Die' default: true.");
             LoversImpostorLover = config.Bind("Neutral Roles", "LoversImpostorLover", true, "Allow one Lover of a pair to be an Impostor; the pair still wins together. Town Of Us rolls this chance, this build applies it whenever an Impostor is available.");
             MorphlingMorphCooldown = BindSeconds(config, "Impostor Roles", "MorphlingMorphCooldown", 25f, "Seconds between Morphling morphs. Town-Of-Us default: 25.");
@@ -312,9 +296,7 @@ namespace TownOfRoles.Core
             UndertakerDragCooldown = BindSeconds(config, "Impostor Roles", "UndertakerDragCooldown", 25f, "Seconds between Undertaker drags. Town-Of-Us default: 25.");
             FootprintInterval = BindSeconds(config, "Crewmate Roles", "FootprintInterval", 1f, "Seconds between Investigator footprint drops. Town-Of-Us default: 1.");
             FootprintDuration = BindSeconds(config, "Crewmate Roles", "FootprintDuration", 10f, "How long Investigator footprints stay visible. Town-Of-Us default: 10.");
-            // Upstream's AnonymousFootPrint defaults to FALSE (footprints keep the
-            // player's colour). This previously defaulted to true while its own
-            // description claimed to be the Town-Of-Us default.
+
             FootprintAnonymous = config.Bind("Crewmate Roles", "FootprintAnonymous", false, "Investigator footprints are grey instead of player-colored. Town-Of-Us AnonymousFootPrint default: false.");
             RewindCooldown = BindSeconds(config, "Crewmate Roles", "RewindCooldown", 25f, "Seconds between Time Lord rewinds. Town-Of-Us default: 25.");
             RewindSeconds = BindSeconds(config, "Crewmate Roles", "RewindSeconds", 3f, "How far back a Time Lord rewind goes. Town-Of-Us 'Rewind Duration' default: 3.");
@@ -345,9 +327,6 @@ namespace TownOfRoles.Core
             ModifierButtonBarry = BindRoleToggle(config, "Modifiers", "ButtonBarry", "Button Barry modifier: can call an emergency meeting from anywhere (/meeting).");
             ModifierButtonBarryProbability = BindChance(config, "Modifiers", "ButtonBarryProbability", 0f, "Chance each player gets the Button Barry modifier.");
 
-            // How many custom roles the lobby may field at once, per team. Town Of Us caps
-            // these and leaves crewmate roles uncapped, so a game can give a Sheriff to
-            // several crewmates but only one Impostor and one Neutral hold a custom role.
             MaxImpostorRoles = BindCount(config, "Role Limits", "MaxImpostorRoles", 1,
                 "How many players may hold a custom Impostor role in one game. Town-Of-Us 'Max Impostor Roles' default: 1. Set 0 for no cap (this mod's old behaviour, and not what Town Of Us does).");
             MaxNeutralRoles = BindCount(config, "Role Limits", "MaxNeutralRoles", 1,
@@ -389,7 +368,6 @@ namespace TownOfRoles.Core
         public static bool RevealRole =>
             SeerRevealMode != null && string.Equals(SeerRevealMode.Value?.Trim(), "Role", StringComparison.OrdinalIgnoreCase);
 
-        // How many players may hold a custom role of team, or 0 for uncapped.
         public static int RoleCap(RoleTeamTypes team) =>
             team == RoleTeamTypes.Impostor ? Count(MaxImpostorRoles, 1)
             : team == RoleTeamTypes.Neutral ? Count(MaxNeutralRoles, 1)
@@ -409,8 +387,6 @@ namespace TownOfRoles.Core
 
         private static void MigrateLegacyEntries(ConfigFile config, Dictionary<ConfigDefinition, string> fileValues)
         {
-            // Old section -> new section/key mappings. Only migrate when the new key
-            // did not already exist, so a user's new-section value always wins.
             Migrate(config, fileValues, "Crewmate Roles", "Sheriff", "Roles", "Sheriff");
             Migrate(config, fileValues, "Crewmate Roles", "Engineer", "Roles", "Engineer");
             Migrate(config, fileValues, "Crewmate Roles", "Medic", "Roles", "Medic");
@@ -449,10 +425,6 @@ namespace TownOfRoles.Core
             Migrate(config, fileValues, "Crewmate Roles", "SheriffKillOther", "Sheriff", "KillOther");
             Migrate(config, fileValues, "Crewmate Roles", "SheriffBodyReport", "Sheriff", "BodyReport");
 
-            // The [Diagnostics] section is gone: the crash-bisect switches are removed, and
-            // the settings that were only filed there are moved to the section that names
-            // them. Migrated rather than renamed, so a tester's existing choices survive the
-            // move instead of silently reverting to the defaults.
             Migrate(config, fileValues, "Diagnostics", "EnableGameplayHooks", "Gameplay", "EnableGameplayHooks");
             Migrate(config, fileValues, "Diagnostics", "EnableCustomAbilityButtons", "Gameplay", "EnableCustomAbilityButtons");
             Migrate(config, fileValues, "Diagnostics", "BootScreenPreload", "Client", "BootScreenPreload");
@@ -485,8 +457,6 @@ namespace TownOfRoles.Core
             }
             catch
             {
-                // A malformed legacy value should never prevent the mod from loading;
-                // the new entry simply keeps its documented default.
             }
         }
 
@@ -520,7 +490,6 @@ namespace TownOfRoles.Core
             }
             catch
             {
-                // Config migration is best effort and must never block plugin startup.
             }
             return values;
         }
@@ -560,29 +529,18 @@ namespace TownOfRoles.Core
         private static int Clamp(int value, int min, int max) => value < min ? min : value > max ? max : value;
         private static float Clamp(float value, float min, float max) => value < min ? min : value > max ? max : value;
 
-        // Role toggle lookup
-
         private static Dictionary<string, ConfigEntry<bool>> _roleToggles;
 
-        // True when the named role's activate toggle is on. The name is a role key as produced
-        // by RoleCatalog.KeyOf ("Sheriff", "TimeLord", "Glitch"), never the display name.
         public static bool IsEnabled(string roleKey)
         {
             if (string.IsNullOrEmpty(roleKey)) return false;
-            // A mod switched off for the session (the TOR tab's own switch) reads as every
-            // role being off, which is what empties the role list the settings window draws.
-            // Assignment is stopped separately, in RoleRegistry.
+
             if (SessionDisable.IsOff) return false;
-            // Rebuild while empty as well as while null: a lookup that runs
-            // before Init has bound the entries would otherwise cache an empty
-            // map and report every role as disabled for the rest of the session.
+
             if (_roleToggles == null || _roleToggles.Count == 0) _roleToggles = BuildRoleToggleLookup();
             return _roleToggles.TryGetValue(roleKey, out var entry) && entry != null && entry.Value;
         }
 
-        // How many catalog roles are switched on. Builds the same toggle lookup IsEnabled uses,
-        // and touches RoleCatalog.All, so calling this is also the cheap "warm the role tables"
-        // step the boot-screen preload runs before the menu exists.
         public static int EnabledRoleCount()
         {
             int count = 0;

@@ -1,29 +1,24 @@
 using System;
 using System.Collections.Generic;
-using ClassicUs.Reactor;
+using Atomic;
 using MarshAPI;
 using UnityEngine;
 using TownOfRoles.Core;
 
 namespace TownOfRoles.Roles.TimeLord
 {
-    // Time Lord gameplay logic (ported from Town-Of-Us' TimeLord.cs).
     internal static class TimeLordSystem
     {
         private const string RequestRewindRpc = "townofroles.TimeLordRequestRewind";
         private const string ReviveRpc = "townofroles.TimeLordRewindRevive";
         private const int SampleCount = 90;
-        private const int SamplesPerTick = 5; // accumulate a position sample every 5 ticks
+        private const int SamplesPerTick = 5;
 
         private static readonly Dictionary<byte, Vector2[]> History = new();
-        // Timestamp of each recorded sample (same ring layout as History).
-        // Rewind looks up "where was this player at T-seconds ago" by time, not
-        // by tick arithmetic, SamplesPerTick pacing depends on framerate, so
-        // converting seconds→steps without timestamps drifted badly.
+
         private static readonly Dictionary<byte, float[]> HistoryTimes = new();
         private static readonly Dictionary<byte, int> HistoryWrite = new();
-        // Host-side record of when each player died (unscaled time). RewindRevive
-        // resurrects anyone whose death falls inside the rewound window.
+
         private static readonly Dictionary<byte, float> DeathTimes = new();
         private static readonly Dictionary<byte, DateTime> Cooldowns = new();
         private static int _tickCount;
@@ -54,14 +49,12 @@ namespace TownOfRoles.Roles.TimeLord
             if (RoleConfig.RewindRevive?.Value != false) ApplyRevive(seconds);
         }
 
-        // Host tick: track deaths; record positions on the sample cadence.
         public static void Tick()
         {
             var client = AmongUsClient.Instance;
             if (client == null || !client.AmHost) return;
             if (PlayerControl.GameOptions == null) return;
 
-            // Track death times for RewindRevive.
             foreach (var player in PlayerControl.AllPlayerControls)
             {
                 if (player == null || player.Data == null || player.Data.Disconnected) continue;
@@ -72,7 +65,7 @@ namespace TownOfRoles.Roles.TimeLord
                 }
                 else if (DeathTimes.ContainsKey(id))
                 {
-                    DeathTimes.Remove(id); // revived by Altruist/etc.
+                    DeathTimes.Remove(id);
                 }
             }
 
@@ -101,7 +94,6 @@ namespace TownOfRoles.Roles.TimeLord
             }
         }
 
-        // Snap every alive player to their recorded position ~seconds ago.
         private static void ApplyRewind(float seconds)
         {
             if (seconds <= 0f) return;
@@ -115,33 +107,28 @@ namespace TownOfRoles.Roles.TimeLord
                 if (!HistoryTimes.TryGetValue(player.PlayerId, out var times)) continue;
 
                 var write = HistoryWrite[player.PlayerId];
-                // Newest recorded sample at or before the cutoff (walk back from
-                // the write head). Falls back to the oldest sample when history
-                // is shorter than the rewind window.
+
                 Vector2 target = ring[write];
                 var found = false;
                 for (int back = 1; back <= SampleCount; back++)
                 {
                     int i = (write - back + SampleCount) % SampleCount;
-                    if (times[i] <= 0f) break; // unwritten slot → end of history
+                    if (times[i] <= 0f) break;
                     target = ring[i];
                     found = true;
                     if (times[i] <= cutoff) break;
                 }
-                if (!found || target == Vector2.zero) continue; // no usable history
+                if (!found || target == Vector2.zero) continue;
                 try { player.NetTransform.RpcSnapTo(target); } catch { }
             }
         }
 
-        // RewindRevive (Town-Of-Us): players killed inside the rewind window come back, host
-        // revives them via the game's own Revive(), removes their bodies, and every client
-        // mirrors it over the companion RPC.
         private static void ApplyRevive(float seconds)
         {
             var cutoff = Time.unscaledTime - seconds;
             foreach (var pair in new Dictionary<byte, float>(DeathTimes))
             {
-                if (pair.Value < cutoff) continue; // died before the window
+                if (pair.Value < cutoff) continue;
                 DeathTimes.Remove(pair.Key);
 
                 var victim = FindPlayer(pair.Key);
@@ -164,7 +151,7 @@ namespace TownOfRoles.Roles.TimeLord
             }
         }
 
-        [ReactorRpc(ReviveRpc)]
+        [AtomicRpc(ReviveRpc)]
         private static void OnReviveRpc(byte senderId, byte victimId)
         {
             var client = AmongUsClient.Instance;
@@ -175,7 +162,7 @@ namespace TownOfRoles.Roles.TimeLord
             RemoveBody(victimId);
         }
 
-        [ReactorRpc(RequestRewindRpc)]
+        [AtomicRpc(RequestRewindRpc)]
         private static void OnRequestRewind(byte senderId, byte playerId)
         {
             var client = AmongUsClient.Instance;

@@ -9,15 +9,13 @@ namespace TownOfRoles.Roles.Sheriff
 
         public static bool IsCoolingDown => DateTime.UtcNow < _cooldownUntil;
 
-        // Seconds until the shot is ready, for the HUD's cooldown digits, the same clock
-        // IsCoolingDown gates on, so the digits cannot say ready while the gate still says no.
         public static float SecondsRemaining =>
             Mathf.Max(0f, (float)(_cooldownUntil - DateTime.UtcNow).TotalSeconds);
 
         public static bool TryStartCooldown()
         {
             if (IsCoolingDown) return false;
-            _cooldownUntil = DateTime.UtcNow.AddSeconds(Options.KillCooldown);
+            _cooldownUntil = DateTime.UtcNow.AddSeconds(SheriffOptions.KillCooldown);
             return true;
         }
 

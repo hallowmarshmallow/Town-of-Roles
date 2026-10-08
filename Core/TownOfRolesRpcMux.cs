@@ -3,16 +3,13 @@ using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
 using BepInEx.Logging;
-using ClassicUs.Reactor;
+using Atomic;
 using HarmonyLib;
 using Hazel;
 using UnityEngine;
 
 namespace TownOfRoles.Core
 {
-    // Reactor 1.2 exposes only 39 custom RPC ids. Town Of Roles has more role messages than
-    // that, so registering every message directly leaves roles near the end of the allocator
-    // without networking.
     internal static class TownOfRolesRpcMux
     {
         private const string TransportKey = "townofroles.RpcMux";
@@ -21,9 +18,6 @@ namespace TownOfRoles.Core
         private static bool _installed;
         internal static bool _warnedMuxDown;
 
-        // True once the mux transport is installed. When false (install failed or config
-        // disabled), RpcRegistration skips role RPC keys entirely so they never overflow
-        // Reactor's finite native RPC-id range.
         internal static bool Active => _installed;
 
         internal static void Install()
@@ -32,19 +26,13 @@ namespace TownOfRoles.Core
             var harmony = new Harmony(TownOfRolesPlugin.Guid + ".rpcmux");
             try
             {
-                harmony.CreateClassProcessor(typeof(ReactorAPI_RegisterRpcMethods_MuxPatch)).Patch();
-                harmony.CreateClassProcessor(typeof(ReactorAPI_SendRpcMethod_MuxPatch)).Patch();
+                harmony.CreateClassProcessor(typeof(AtomicAPI_RegisterRpcMethods_MuxPatch)).Patch();
+                harmony.CreateClassProcessor(typeof(AtomicAPI_SendRpcMethod_MuxPatch)).Patch();
 
-                // This type is deliberately excluded by the registration prefix so
-                // Reactor reserves exactly one real transport id for the mod.
-                ReactorAPI.RegisterRpcMethods(typeof(TownOfRolesRpcMux));
+                AtomicAPI.RegisterRpcMethods(typeof(TownOfRolesRpcMux));
             }
             catch
             {
-                // All-or-nothing: a half-installed mux (registration prefix live,
-                // send prefix missing) would reserve no mod ids while every role
-                // send still went through Reactor's raw path -> GetId returns 0
-                // -> callId-0 messages -> the exact segfault we are fixing.
                 harmony.UnpatchSelf();
                 throw;
             }
@@ -53,10 +41,6 @@ namespace TownOfRoles.Core
 
         internal static bool Register(Type type)
         {
-            // Only multiplex this mod's own types. Other plugins (the MarshAPI
-            // base, Reactor itself, or third-party mods) register through the
-            // same static method; returning false for them would steal their
-            // RPC ids and break their networking.
             if (type == null || type == typeof(TownOfRolesRpcMux)) return true;
             if (type.Assembly != typeof(TownOfRolesRpcMux).Assembly) return true;
             foreach (var method in type.GetMethods(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic))
@@ -64,7 +48,7 @@ namespace TownOfRoles.Core
                 string key = null;
                 foreach (var attribute in method.GetCustomAttributesData())
                 {
-                    if (attribute.AttributeType != typeof(ReactorRpcAttribute) || attribute.ConstructorArguments.Count != 1) continue;
+                    if (attribute.AttributeType != typeof(AtomicRpcAttribute) || attribute.ConstructorArguments.Count != 1) continue;
                     key = attribute.ConstructorArguments[0].Value as string;
                     break;
                 }
@@ -74,33 +58,32 @@ namespace TownOfRoles.Core
             return false;
         }
 
-        // Plugin-facing send entry point used by every role system in place of
-        // ReactorAPI.SendRpcMethod.
         internal static void Send(string key, params object[] args)
         {
-            // TrySend returns true when the original ReactorAPI call should run
-            // (transport key / foreign key) and false when it was handled or
-            // dropped (multiplexed role keys / unreserved townofroles keys).
-            if (TrySend(key, args)) ReactorAPI.SendRpcMethod(key, args);
+            if (TrySend(key, args)) AtomicAPI.SendRpcMethod(key, args);
         }
+
+        // Keys already reported as unrouted, so the warning below is one line per key rather
+        // than one per send.
+        private static readonly HashSet<string> _warnedUnrouted = new();
 
         internal static bool TrySend(string key, object[] args)
         {
-            if (key == TransportKey) return true; // the transport itself: run Reactor's real send
+            if (key == TransportKey) return true;
             if (!Handlers.ContainsKey(key))
             {
-                // Foreign keys (classicus.*, third-party mods) pass through to
-                // their own Reactor registrations. But a mod key that was never
-                // captured (disabled role, unregistered system) must NOT reach
-                // GetId() -> 0 -> callId-0 segfault: drop it instead.
-                if (key.StartsWith("townofroles.", StringComparison.Ordinal)) return false;
+                // A townofroles. key with no handler here went straight to Atomic instead,
+                // which is what happens to any type registered before the mux was installed.
+                // Dropping the send, which is what this used to do, broke that RPC for the
+                // rest of the session with nothing in the log to show for it. Handing the key
+                // back to Atomic sends it the way its registration asked for.
+                if (key.StartsWith("townofroles.", StringComparison.Ordinal) && _warnedUnrouted.Add(key))
+                    Log.LogWarning("Sending " + key + " outside the mux; its handler was registered before the mux was installed.");
                 return true;
             }
             try
             {
-                // Reactor 1.1 only supports bool/byte/int/float/string RPC arguments,
-                // so the binary payload crosses the transport as a base64 string.
-                ReactorAPI.SendRpcMethod(TransportKey, key, Convert.ToBase64String(Serialize(args)));
+                AtomicAPI.SendRpcMethod(TransportKey, key, Convert.ToBase64String(Serialize(args)));
             }
             catch (Exception e)
             {
@@ -109,7 +92,7 @@ namespace TownOfRoles.Core
             return false;
         }
 
-        [ReactorRpc(TransportKey)]
+        [AtomicRpc(TransportKey)]
         private static void Receive(byte senderId, string key, string payload)
         {
             if (!Handlers.TryGetValue(key, out var method))
@@ -188,7 +171,6 @@ namespace TownOfRoles.Core
         }
     }
 
-    // Registration gate used by TownOfRolesPlugin for every role type.
     internal static class RpcRegistration
     {
         public static void Register(Type type)
@@ -196,27 +178,25 @@ namespace TownOfRoles.Core
             if (type == null) return;
             if (!TownOfRolesRpcMux.Active)
             {
-                // Log once: a down mux degrades every role to local-only, so one
-                // prominent warning beats 27 repeated ones at startup.
                 if (!TownOfRolesRpcMux._warnedMuxDown)
                 {
                     TownOfRolesRpcMux._warnedMuxDown = true;
-                    TownOfRolesRpcMux.Log.LogWarning("mux is down, is reactor installed?");
+                    TownOfRolesRpcMux.Log.LogWarning("mux is down, is Atomic installed?");
                 }
                 return;
             }
-            ReactorAPI.RegisterRpcMethods(type);
+            AtomicAPI.RegisterRpcMethods(type);
         }
     }
 
-    [HarmonyPatch(typeof(ReactorAPI), nameof(ReactorAPI.RegisterRpcMethods), new[] { typeof(Type) })]
-    internal static class ReactorAPI_RegisterRpcMethods_MuxPatch
+    [HarmonyPatch(typeof(AtomicAPI), nameof(AtomicAPI.RegisterRpcMethods), new[] { typeof(Type) })]
+    internal static class AtomicAPI_RegisterRpcMethods_MuxPatch
     {
         private static bool Prefix(Type type) => TownOfRolesRpcMux.Register(type);
     }
 
-    [HarmonyPatch(typeof(ReactorAPI), nameof(ReactorAPI.SendRpcMethod), new[] { typeof(string), typeof(object[]) })]
-    internal static class ReactorAPI_SendRpcMethod_MuxPatch
+    [HarmonyPatch(typeof(AtomicAPI), nameof(AtomicAPI.SendRpcMethod), new[] { typeof(string), typeof(object[]) })]
+    internal static class AtomicAPI_SendRpcMethod_MuxPatch
     {
         private static bool Prefix(string key, object[] args) => TownOfRolesRpcMux.TrySend(key, args);
     }

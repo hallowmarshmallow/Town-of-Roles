@@ -1,13 +1,12 @@
 using System;
 using System.Collections.Generic;
-using ClassicUs.Reactor;
+using Atomic;
 using MarshAPI;
 using UnityEngine;
 using TownOfRoles.Core;
 
 namespace TownOfRoles.Roles.Swooper
 {
-    // Swooper gameplay logic (ported from Town-Of-Us' Swooper.cs).
     internal static class SwooperSystem
     {
         private const string StartRpc = "townofroles.SwooperStart";
@@ -44,7 +43,6 @@ namespace TownOfRoles.Roles.Swooper
             SetHidden(swooper, true);
         }
 
-        // Runs every frame on every client: hide active swoopers, restore on expiry.
         public static void Tick()
         {
             if (InvisibleUntil.Count == 0) return;
@@ -54,8 +52,6 @@ namespace TownOfRoles.Roles.Swooper
                 var player = FindPlayer(key);
                 if (player == null || player.Data == null || player.Data.IsDead)
                 {
-                    // Re-enable renderers even on death/despawn so a revived
-                    // Swooper is not left invisible forever.
                     if (player != null) SetHidden(player, false);
                     InvisibleUntil.Remove(key);
                     Hidden.Remove(key);
@@ -86,7 +82,7 @@ namespace TownOfRoles.Roles.Swooper
             catch { }
         }
 
-        [ReactorRpc(RequestRpc)]
+        [AtomicRpc(RequestRpc)]
         private static void OnRequest(byte senderId, byte playerId)
         {
             var client = AmongUsClient.Instance;
@@ -103,7 +99,7 @@ namespace TownOfRoles.Roles.Swooper
             }
         }
 
-        [ReactorRpc(StartRpc)]
+        [AtomicRpc(StartRpc)]
         private static void OnStart(byte senderId, byte swooperId, float duration)
         {
             var client = AmongUsClient.Instance;
@@ -121,10 +117,8 @@ namespace TownOfRoles.Roles.Swooper
             return null;
         }
 
-        // Seconds until this Swooper may swoop again, zero when ready.
         public static float SecondsRemaining(PlayerControl swooper) => SecondsLeft(Cooldowns, swooper);
 
-        // Seconds this Swooper's vanish still runs for, zero when they are visible.
         public static float VanishedSecondsRemaining(PlayerControl swooper) => SecondsLeft(InvisibleUntil, swooper);
 
         private static float SecondsLeft(Dictionary<byte, DateTime> table, PlayerControl player)
@@ -140,7 +134,6 @@ namespace TownOfRoles.Roles.Swooper
 
         public static void Reset()
         {
-            // Restore visibility for anyone still hidden before clearing state.
             foreach (var player in PlayerControl.AllPlayerControls)
             {
                 if (player != null && Hidden.Contains(player.PlayerId))

@@ -21,10 +21,6 @@ namespace TownOfRoles.Core
             var viewer = PlayerControl.LocalPlayer;
             if (viewer == null || viewer.Data == null) return;
 
-            // Switched off for the session (the TOR tab's own switch): the names go back to
-            // what the game wrote, rather than being left as the last line this patch put
-            // there. A role name that outlived the switch would be the one thing that made
-            // "the mod is off" visibly false.
             if (SessionDisable.IsOff)
             {
                 foreach (var player in PlayerControl.AllPlayerControls)
@@ -35,10 +31,6 @@ namespace TownOfRoles.Core
                 return;
             }
 
-            // While the Camouflager's round-wide camouflage is live, every
-            // overhead name must stay blank. The role-line branches below run at
-            // 10 Hz and would otherwise re-write "Name\n<Role" right on top of
-            // CamouflagerSystem.ApplyCamo's blanks.
             if (CamouflagerSystem.IsActive)
             {
                 foreach (var player in PlayerControl.AllPlayerControls)
@@ -54,14 +46,11 @@ namespace TownOfRoles.Core
                 if (player == null || player.Data == null || player.nameText == null) continue;
                 if (SeerSystem.TryGetReveal(viewer, player, out var revealText, out var revealColor))
                 {
-                    // A Seer's investigation result for this target replaces the
-                    // target's own role line (only the Seer sees it).
                     SetText(player.nameText, RolePresentation.WithRole(player.Data.PlayerName, revealText));
                     SetColor(player.nameText, revealColor);
                 }
                 else if (RolePresentation.TryGet(player, out var roleName, out var roleColor) && RolePresentation.CanSee(viewer, player))
                 {
-                    // The local player also sees their own modifiers next to the role.
                     if (player == viewer)
                     {
                         var mods = ModifierSystem.NamesFor(player.PlayerId);
@@ -82,8 +71,6 @@ namespace TownOfRoles.Core
         {
             if (meeting == null) return;
 
-            // Same switch, same reason as UpdateWorld: a role line left on a meeting name
-            // plate after the mod is switched off is a lie about what is running.
             if (SessionDisable.IsOff)
             {
                 var switchedOff = GameReflection.GetPlayerStates(meeting);
@@ -97,7 +84,7 @@ namespace TownOfRoles.Core
                 }
                 return;
             }
-            // playerStates is private in the 2026.8.9 interop.
+
             var states = GameReflection.GetPlayerStates(meeting);
             if (states == null)
             {
@@ -112,11 +99,6 @@ namespace TownOfRoles.Core
             var viewer = PlayerControl.LocalPlayer;
             if (viewer == null || viewer.Data == null) return;
 
-            // Only show role names while the meeting is still in Discussion or
-            // waiting for votes (NotVoted). Once votes start tallying/shown
-            // (Voted/Results/Proceeding) the game draws its own "voted for"
-            // indicators over the name plate, so we restore the plain player
-            // name to avoid the role line colliding with them.
             var state = GameReflection.GetMeetingState(meeting);
             var showRoles = state == MeetingHud.VoteStates.Discussion || state == MeetingHud.VoteStates.NotVoted;
 
@@ -128,15 +110,12 @@ namespace TownOfRoles.Core
 
                 if (showRoles && SeerSystem.TryGetReveal(viewer, target, out var revealText, out var revealColor))
                 {
-                    // A Seer's investigation result for this target replaces the
-                    // target's own role line (only the Seer sees it).
                     SetText(area.NameText, RolePresentation.WithRole(target.Data.PlayerName, revealText));
                     SetColor(area.NameText, revealColor);
                     SetMeetingTypography(area.NameText, 1.18f);
                 }
                 else if (showRoles && RolePresentation.TryGet(target, out var roleName, out var roleColor) && RolePresentation.CanSee(viewer, target))
                 {
-                    // The local player also sees their own modifiers next to the role.
                     if (target == viewer)
                     {
                         var mods = ModifierSystem.NamesFor(target.PlayerId);
@@ -242,10 +221,6 @@ namespace TownOfRoles.Core
         }
     }
 
-    // Meeting name plates are driven from MeetingHud.Update rather than
-    // HudManager.Update: this is the loop that is guaranteed to run for the
-    // whole meeting (HudManager.Update can be starved during meeting cutscenes
-    // on some builds), and it also lets us gate on the meeting vote state.
     [HarmonyPatch(typeof(MeetingHud), nameof(MeetingHud.Update))]
     internal static class MeetingHud_Update_PresentationPatch
     {

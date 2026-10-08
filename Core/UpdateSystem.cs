@@ -10,20 +10,15 @@ using TownOfRoles.Core;
 
 namespace TownOfRoles.Core
 {
-    // Self-update pipeline (main mod side).
     internal static class UpdateSystem
     {
         public const string StagingDirName = ".townofroles-update";
         public const string PendingFileName = "pending.json";
 
-        // The plugin file an update replaces. Named once: the download, the pending marker and
-        // the applier script all have to agree on it.
         public const string StagedFileName = "TownOfRoles.dll";
 
         public const string CurrentVersion = TownOfRolesPlugin.Version;
 
-        // The plugins folder, or the conventional path when BepInEx's own Paths have not
-        // resolved yet. Shared with UpdateApplier so the staging directory is computed one way.
         public static string PluginDirectory()
         {
             try { return Paths.PluginPath; }
@@ -49,7 +44,7 @@ namespace TownOfRoles.Core
         {
             if (UpdateConfig.Enabled?.Value != true) return;
             if (string.IsNullOrWhiteSpace(UpdateConfig.ManifestUrl?.Value)) return;
-            if (UpdateConfig.ManifestUrl.Value.Contains("OWNER/REPO")) return; // placeholder
+            if (UpdateConfig.ManifestUrl.Value.Contains("OWNER/REPO")) return;
 
             _ = Task.Run(() => CheckAsync());
         }
@@ -72,18 +67,15 @@ namespace TownOfRoles.Core
             }
             catch
             {
-                // Update checks are best-effort and must never disturb the game.
             }
         }
 
-        // Called once per frame while in a lobby; shows the prompt at the right moment.
         public static bool ShouldPromptNow()
         {
             if (_latest == null || _promptShownThisSession) return false;
             if (!HudManager.InstanceExists) return false;
             try
             {
-                // Only in the lobby/main menu, never mid-round or in a meeting.
                 if (ShipStatus.Instance != null) return false;
             }
             catch
@@ -95,8 +87,6 @@ namespace TownOfRoles.Core
 
         public static void MarkPromptShown() => _promptShownThisSession = true;
 
-        // Downloads the staged DLL, verifies SHA-256, and writes the pending marker. Returns a
-        // human-readable status for the modal.
         public static async Task<string> DownloadAndStageAsync()
         {
             var info = _latest;
@@ -135,10 +125,6 @@ namespace TownOfRoles.Core
                             + "\"sha256\":\"" + (info.Sha256 ?? Sha256Hex(bytes)) + "\"}";
                 await File.WriteAllTextAsync(pendingPath, pending, Encoding.UTF8, cts.Token).ConfigureAwait(false);
 
-                // Arm the post-exit applier now, while this process still owns the
-                // session: it has to be running before the game closes so the swap can
-                // happen the moment the DLL is released. Never a preloader-patched
-                // dependency, see UpdateApplier.
                 UpdateApplier.Arm();
 
                 return "Update ready — restart the game to apply.";

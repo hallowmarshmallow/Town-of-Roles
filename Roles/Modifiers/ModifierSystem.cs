@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
-using ClassicUs.Reactor;
+using Atomic;
 using MarshAPI;
 using HarmonyLib;
 using Il2CppInterop.Runtime.InteropTypes.Arrays;
@@ -10,7 +10,6 @@ using TownOfRoles.Core;
 
 namespace TownOfRoles.Roles.Modifiers
 {
-    // Player modifiers, ported from the original Town-Of-Us mod.
     internal static class ModifierSystem
     {
         public const string Torch = "Torch";
@@ -27,15 +26,13 @@ namespace TownOfRoles.Roles.Modifiers
         private const int MaxRetries = 300;
         private const float GiantScale = 1.4f;
 
-        private static readonly Dictionary<byte, HashSet<string>> Assigned = new(); // playerId -> modifiers
+        private static readonly Dictionary<byte, HashSet<string>> Assigned = new();
         private static bool _assigned;
         private static int _attempts;
-        private static readonly Dictionary<byte, int> DiseasedPenalties = new(); // killerId -> marker
+        private static readonly Dictionary<byte, int> DiseasedPenalties = new();
         private static bool _lightCaptured;
         private static float _lightBaseScale = -1f;
 
-        // Skipped while the ship/spawn transition is settling (set by GameStarted):
-        // scaling freshly-spawned player bodies on the spawn frame can fault the CLR.
         private static float _settleUntil = float.MinValue;
 
         public static bool Has(byte playerId, string modifier) =>
@@ -44,7 +41,6 @@ namespace TownOfRoles.Roles.Modifiers
         public static bool Has(PlayerControl player, string modifier) =>
             player != null && Has(player.PlayerId, modifier);
 
-        // True when at least one modifier is enabled (cheap per-frame gate).
         public static bool AnyEnabled =>
             (RoleConfig.ModifierTorch?.Value == true) ||
             (RoleConfig.ModifierDiseased?.Value == true) ||
@@ -67,7 +63,6 @@ namespace TownOfRoles.Roles.Modifiers
             return sb.ToString();
         }
 
-        // Tick (host: assignment + diseased penalty; local: torch/flash)
         public static void Tick()
         {
             var local = PlayerControl.LocalPlayer;
@@ -87,10 +82,9 @@ namespace TownOfRoles.Roles.Modifiers
             ApplySpeed(local);
         }
 
-        // Called on every client: keeps Giant players visually big.
         public static void ApplyGiantScales()
         {
-            if (Time.unscaledTime < _settleUntil) return; // spawn transition: let players finish spawning first
+            if (Time.unscaledTime < _settleUntil) return;
             if (ExileController.Instance != null || MeetingHud.Instance != null) return;
             foreach (var player in PlayerControl.AllPlayerControls)
             {
@@ -98,11 +92,6 @@ namespace TownOfRoles.Roles.Modifiers
                 if (!Has(player.PlayerId, Giant)) continue;
                 try
                 {
-                    // A destroyed / not-yet-spawned body has a null Transform in
-                    // IL2CPP; touching its localScale faults the CLR (the native
-                    // PAL_SEHException). Also only write when the scale actually
-                    // changed, so a healthy body is mutated once instead of every
-                    // frame while it is mid-transition.
                     var body = player.transform;
                     if (body == null) continue;
                     if (Mathf.Abs(body.localScale.x - GiantScale) < 0.001f) continue;
@@ -112,12 +101,10 @@ namespace TownOfRoles.Roles.Modifiers
             }
         }
 
-        // Assignment
         private static void TryAssign()
         {
             if (PlayerControl.AllPlayerControls == null || PlayerControl.AllPlayerControls.Count == 0) return;
 
-            // Wait for roles to be assigned (players have a myRole) before rolling.
             bool ready = false;
             foreach (var player in PlayerControl.AllPlayerControls)
             {
@@ -134,7 +121,7 @@ namespace TownOfRoles.Roles.Modifiers
                 {
                     var modifier = All[i];
                     if (!IsEnabled(modifier)) continue;
-                    // Torch / Diseased ride on Crewmates (the original mod's team split).
+
                     if ((modifier == Torch || modifier == Diseased) && team != RoleTeamTypes.Crewmate) continue;
                     if (UnityEngine.Random.Range(0f, 100f) >= Probability(modifier)) continue;
                     if (!Assigned.TryGetValue(player.PlayerId, out var set))
@@ -150,7 +137,7 @@ namespace TownOfRoles.Roles.Modifiers
             var payload = BuildPayload();
             if (payload == null) return;
             try { TownOfRolesRpcMux.Send(AssignRpc, payload); } catch (Exception e) { Log("broadcast: " + e.Message); }
-            ParsePayload(payload); // host parses its own table for a single code path
+            ParsePayload(payload);
         }
 
         private static bool IsEnabled(string modifier)
@@ -217,7 +204,7 @@ namespace TownOfRoles.Roles.Modifiers
             }
         }
 
-        [ReactorRpc(AssignRpc)]
+        [AtomicRpc(AssignRpc)]
         private static void OnAssign(byte senderId, string payload)
         {
             var client = AmongUsClient.Instance;
@@ -225,7 +212,6 @@ namespace TownOfRoles.Roles.Modifiers
             ParsePayload(payload);
         }
 
-        // Torch
         private static void ApplyTorchLight(PlayerControl local)
         {
             if (local.myLight == null) return;
@@ -237,15 +223,13 @@ namespace TownOfRoles.Roles.Modifiers
                     _lightBaseScale = scale.x;
                     _lightCaptured = true;
                 }
-                // When lights are sabotaged the game shrinks the light; a Torch
-                // keeps the full radius it had while lights were normal.
+
                 if (_lightBaseScale > 0f && Has(local.PlayerId, Torch) && scale.x < _lightBaseScale - 0.05f)
                     local.myLight.transform.localScale = new Vector3(_lightBaseScale, _lightBaseScale, scale.z);
             }
             catch { }
         }
 
-        // Flash / Giant speed
         private static void ApplySpeed(PlayerControl local)
         {
             if (local.MyPhysics == null) return;
@@ -255,7 +239,6 @@ namespace TownOfRoles.Roles.Modifiers
             if (multiplier != 1f) local.MyPhysics.Speed = 4.5f * multiplier;
         }
 
-        // Diseased (host)
         public static void OnBeforeMurder(MurderEventArgs args)
         {
             var client = AmongUsClient.Instance;
@@ -277,8 +260,7 @@ namespace TownOfRoles.Roles.Modifiers
                 }
                 var baseCooldown = PlayerControl.GameOptions != null ? PlayerControl.GameOptions.KillCooldown : 10f;
                 var timer = killer.killTimer;
-                // The game applies the normal cooldown right after the kill;
-                // once we see it, triple it.
+
                 if (timer > 0.05f && timer <= baseCooldown + 0.5f)
                 {
                     try { killer.RpcSetKillTimer(baseCooldown * 3f); } catch (Exception e) { Log("diseased: " + e.Message); }
@@ -294,7 +276,6 @@ namespace TownOfRoles.Roles.Modifiers
             return null;
         }
 
-        // Lifecycle
         public static void Reset()
         {
             Assigned.Clear();
@@ -316,10 +297,6 @@ namespace TownOfRoles.Roles.Modifiers
             BepInEx.Logging.Logger.CreateLogSource("TownOfRoles").LogError("ModifierSystem " + message);
     }
 
-    // Tiebreaker: their vote decides tied meetings (host tally)
-    // NOTE: this postfix must stay installed AFTER the Mayor vote-bank postfix on
-    // the same method, so it sees the final tally (Mayor's extra votes included).
-    // The plugin installs Mayor first (Load order), which Harmony preserves.
     [HarmonyPatch(typeof(MeetingHud), "CalculateVotes")]
     internal static class MeetingHud_CalculateVotes_TiebreakerPatch
     {
@@ -329,7 +306,7 @@ namespace TownOfRoles.Roles.Modifiers
             {
                 var client = AmongUsClient.Instance;
                 if (client == null || !client.AmHost) return;
-                // playerStates is private in the 2026.8.9 interop.
+
                 var states = GameReflection.GetPlayerStates(__instance);
                 if (__instance == null || states == null || __result == null) return;
 
@@ -344,9 +321,8 @@ namespace TownOfRoles.Roles.Modifiers
                 var tied = 0;
                 for (int i = 0; i < states.Length; i++)
                     if (__result[i] == bestCount) tied++;
-                if (tied < 2) return; // no tie
+                if (tied < 2) return;
 
-                // The Tiebreaker's vote breaks the tie (only if they voted a player).
                 for (int i = 0; i < states.Length; i++)
                 {
                     var area = states[i];
@@ -373,7 +349,6 @@ namespace TownOfRoles.Roles.Modifiers
         }
     }
 
-    // Drunk: inverted movement controls (local player only)
     [HarmonyPatch(typeof(PlayerPhysics), "FixedUpdate")]
     internal static class PlayerPhysics_FixedUpdate_DrunkPatch
     {
@@ -395,5 +370,4 @@ namespace TownOfRoles.Roles.Modifiers
             }
         }
     }
-
 }

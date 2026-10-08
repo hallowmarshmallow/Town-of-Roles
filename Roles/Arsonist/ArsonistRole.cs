@@ -4,8 +4,6 @@ using TownOfRoles.Core;
 
 namespace TownOfRoles.Roles.Arsonist
 {
-    // Arsonist, a Neutral role that douses players and ignites them to win. Ported from the
-    // original Town-Of-Us Arsonist role.
     internal sealed class ArsonistRole : CustomRole
     {
         public const string Id = "townofroles.Arsonist";

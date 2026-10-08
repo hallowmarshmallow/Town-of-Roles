@@ -25,10 +25,10 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="ClassicUs.GameLibs" Version="2026.9.20.1" PrivateAssets="all" />
+    <PackageReference Include="ClassicUs.GameLibs" Version="2026.9.10.1" PrivateAssets="all" />
 
-    <!-- MarshAPI and Reactor are separate sibling projects cloned alongside TownOfRoles -->
-    <ProjectReference Include="../Reactor/Reactor.csproj" PrivateAssets="all" ExcludeAssets="runtime" />
+    <!-- MarshAPI and Atomic are separate sibling projects cloned alongside TownOfRoles -->
+    <ProjectReference Include="../Atomic/Atomic.csproj" PrivateAssets="all" ExcludeAssets="runtime" />
     <ProjectReference Include="../MarshAPI/MarshAPI.csproj" />
   </ItemGroup>
 

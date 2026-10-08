@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
-using ClassicUs.Reactor;
+using Atomic;
 using MarshAPI;
 using TownOfRoles.Core;
 
@@ -31,9 +31,6 @@ namespace TownOfRoles.Roles.Assassin
         {
             _guessedThisMeeting.Clear();
         }
-
-        // Assignment is performed by MarshAPI's RoleRegistry.AssignForTeam. This role
-        // system intentionally does not maintain a second pool allocator.
 
         public static void OnGameStarted(GameStartedEventArgs _) => Reset();
         public static void OnGameEnded(GameEndedEventArgs _) => Reset();
@@ -118,7 +115,7 @@ namespace TownOfRoles.Roles.Assassin
         private static void ResolveGuess(PlayerControl assassin, PlayerControl target, string guess)
         {
             if (assassin == null || assassin.Data == null || assassin.Data.IsDead || target == null || target.Data == null || target.Data.IsDead || target.Data.Disconnected || !IsAssassin(assassin)) return;
-            // state is private in the 2026.8.9 interop, reflection adapter.
+
             var meeting = MeetingHud.Instance;
             var voteState = GameReflection.GetMeetingState(meeting);
             if (meeting == null || voteState == MeetingHud.VoteStates.Discussion || voteState == MeetingHud.VoteStates.Results ||
@@ -138,7 +135,7 @@ namespace TownOfRoles.Roles.Assassin
                 : $"Wrong guess. The Assassin guessed {guess}; actual role was {actual}.");
         }
 
-        [ReactorRpc(RequestGuessRpc)]
+        [AtomicRpc(RequestGuessRpc)]
         private static void OnRequestGuess(byte senderId, byte assassinId, byte targetId, string guess)
         {
             var client = AmongUsClient.Instance;
@@ -150,7 +147,7 @@ namespace TownOfRoles.Roles.Assassin
                 TryGuessTarget(assassin, target, canonical);
         }
 
-        [ReactorRpc(GuessResultRpc)]
+        [AtomicRpc(GuessResultRpc)]
         private static void OnGuessResult(byte senderId, byte assassinId, byte victimId, bool correct, byte targetId)
         {
             var client = AmongUsClient.Instance;
@@ -195,7 +192,7 @@ namespace TownOfRoles.Roles.Assassin
         private static string CanonicalizeRole(string value)
         {
             if (string.IsNullOrWhiteSpace(value)) return null;
-            // Space-insensitive so "Time Lord" matches "t-lord", "timelord" etc.
+
             var compact = string.Concat(value.Trim().Split((char[])null, StringSplitOptions.RemoveEmptyEntries)).ToLowerInvariant();
             foreach (var role in GuessableRoles)
             {

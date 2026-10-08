@@ -4,8 +4,6 @@ using TownOfRoles.Core;
 
 namespace TownOfRoles.Roles.Assassin
 {
-    // Assassin, an Impostor who can guess a player's role during a meeting. A correct guess
-    // kills the target; a wrong guess kills the Assassin.
     internal sealed class AssassinRole : CustomImpostorRole
     {
         public const string Id = "townofroles.Assassin";

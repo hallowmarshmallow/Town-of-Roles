@@ -4,8 +4,6 @@ using TownOfRoles.Core;
 
 namespace TownOfRoles.Roles.Miner
 {
-    // Miner, an Impostor who can place new vents that connect only to each other, forming their
-    // own private passageway. Ported from the original Town-Of-Us Miner role.
     internal sealed class MinerRole : CustomImpostorRole
     {
         public const string Id = "townofroles.Miner";

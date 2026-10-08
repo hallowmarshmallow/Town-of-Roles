@@ -107,7 +107,7 @@ def main():
     # The merged repo builds the full dependency chain too; stage those DLLs so a
     # single release carries everything BepInEx/plugins/ needs.
     for extra in (
-        os.path.join(ROOT, "Networking", "bin", "Release", "ClassicUs.Reactor.dll"),
+        os.path.join(ROOT, "Networking", "bin", "Release", "Atomic.dll"),
         os.path.join(ROOT, "API", "bin", "Release", "MarshAPI.dll"),
     ):
         if os.path.isfile(extra):

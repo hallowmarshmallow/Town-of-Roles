@@ -1,4 +1,4 @@
-using ClassicUs.Reactor;
+using Atomic;
 using MarshAPI;
 using TownOfRoles.Core;
 
@@ -38,7 +38,7 @@ namespace TownOfRoles.Roles.Assassin
             TownOfRolesRpcMux.Send(RpcKey, ActiveEnabled, (byte)ActiveCount, ActiveChance, ActiveMultiKill, ActiveMeetingUi);
         }
 
-        [ReactorRpc(RpcKey)]
+        [AtomicRpc(RpcKey)]
         private static void Receive(byte senderId, bool enabled, byte count, float chance, bool multiKill, bool meetingUi)
         {
             var client = AmongUsClient.Instance;

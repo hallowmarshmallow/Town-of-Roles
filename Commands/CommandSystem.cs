@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
-using ClassicUs.Reactor;
+using Atomic;
 using MarshAPI;
 using TownOfRoles.Core;
 using TownOfRoles.Roles.Assassin;
@@ -11,7 +11,6 @@ using TownOfRoles.Roles.Modifiers;
 
 namespace TownOfRoles.Commands
 {
-    // Town Of Roles' slash commands.
     internal static class CommandSystem
     {
         private const string ReviveRpc = "townofroles.Revive";
@@ -19,7 +18,6 @@ namespace TownOfRoles.Commands
         private const string CustomCommandRpc = "townofroles.CustomCommand";
         private const string SystemMessageRpc = "townofroles.SystemMessage";
 
-        // Registers the commands and points the framework's seams at this mod.
         public static void Initialize()
         {
             ChatCommands.Reply = SystemChat.Show;
@@ -27,7 +25,6 @@ namespace TownOfRoles.Commands
             ChatCommands.Fallback = HandleCustomCommand;
             ChatCommands.ExtraHelp = CustomHelpLines;
 
-            // Copy, not mechanism: the headings and the self line are this mod's wording.
             ChatCommands.HelpHeader = "Town of Roles commands:";
             ChatCommands.HelpSelfLine = "/help — this list";
 
@@ -83,8 +80,6 @@ namespace TownOfRoles.Commands
 
             ChatCommands.Register(new ChatCommand("meeting", "/meeting — call an emergency meeting (Button Barry)", ButtonBarryMeeting)
             {
-                // Not offered to, and not claimed for, anyone without the modifier: a crewmate typing
-                // /meeting means it as chat, and the text goes through.
                 Visible = ctx => RoleConfig.ModifierButtonBarry?.Value == true
                                  && ModifierSystem.Has(ctx.Sender.PlayerId, ModifierSystem.ButtonBarry),
             });
@@ -102,10 +97,6 @@ namespace TownOfRoles.Commands
 
         }
 
-        // Config-declared custom commands
-
-        // Resolves a command this mod did not register: one declared in the config as
-        // name=&gt;message.
         private static bool HandleCustomCommand(ChatCommandContext ctx)
         {
             var table = GetCustomCommandTable();
@@ -117,7 +108,6 @@ namespace TownOfRoles.Commands
                 return true;
             }
 
-            // Cheap flood guard: at most one custom command every 400 ms.
             var now = DateTime.UtcNow;
             if ((now - _lastCustomCommandRequest).TotalMilliseconds < 400) return true;
             _lastCustomCommandRequest = now;
@@ -126,17 +116,12 @@ namespace TownOfRoles.Commands
             {
                 if (ChatCommands.IsHost)
                 {
-                    // The host broadcasts to the lobby and also displays the message
-                    // directly, so the host always sees it regardless of whether the
-                    // local RPC handler fires (the handler skips on the host).
                     var message = FormatCustomCommand(template, ctx.Sender, ctx.Args);
                     TownOfRolesRpcMux.Send(CustomCommandRpc, message);
                     SystemChat.Show(message);
                 }
                 else
                 {
-                    // Clients ask the host to run the command so only the host's
-                    // config decides what the lobby sees.
                     TownOfRolesRpcMux.Send(RequestCustomCommandRpc, ctx.Name, string.Join(" ", ctx.Args));
                 }
             }
@@ -148,7 +133,6 @@ namespace TownOfRoles.Commands
             return true;
         }
 
-        // The custom commands, as /help lines. Null when there are none.
         private static IEnumerable<string> CustomHelpLines()
         {
             var table = GetCustomCommandTable();
@@ -161,7 +145,7 @@ namespace TownOfRoles.Commands
             return lines;
         }
 
-        [ReactorRpc(RequestCustomCommandRpc)]
+        [AtomicRpc(RequestCustomCommandRpc)]
         private static void OnRequestCustomCommandRpc(byte senderId, string command, string args)
         {
             var client = AmongUsClient.Instance;
@@ -170,7 +154,7 @@ namespace TownOfRoles.Commands
             var table = GetCustomCommandTable();
             if (table == null || !table.TryGetValue(command ?? string.Empty, out var template)) return;
 
-            var sender = ChatCommands.FindPlayer(senderId.ToString(CultureInfo.InvariantCulture));
+            var sender = FindByClientId(senderId);
             if (sender == null || sender.Data == null || sender.Data.Disconnected) return;
 
             var split = string.IsNullOrEmpty(args)
@@ -180,11 +164,24 @@ namespace TownOfRoles.Commands
             TownOfRolesRpcMux.Send(CustomCommandRpc, message);
         }
 
-        [ReactorRpc(CustomCommandRpc)]
+        // A message's sender arrives as a client id, and ChatCommands.FindPlayer reads a
+        // numeric string as a player id, so the two only line up while the id spaces happen to
+        // agree. The welcome line was named after the wrong player, or after nobody.
+        private static PlayerControl FindByClientId(byte clientId)
+        {
+            foreach (var player in PlayerControl.AllPlayerControls)
+            {
+                if (player == null) continue;
+                var client = player.GetClient();
+                if (client != null && client.Id == clientId) return player;
+            }
+
+            return null;
+        }
+
+        [AtomicRpc(CustomCommandRpc)]
         private static void OnCustomCommandRpc(byte senderId, string message)
         {
-            // The host already displayed the message when it broadcast it; only
-            // remote clients display here. Exactly one display per client.
             var client = AmongUsClient.Instance;
             if (client != null && client.AmHost) return;
             if (string.IsNullOrWhiteSpace(message)) return;
@@ -221,12 +218,8 @@ namespace TownOfRoles.Commands
 
         private static DateTime _lastCustomCommandRequest = DateTime.MinValue;
 
-        // The commands
-
         private static void ForceStart(ChatCommandContext ctx)
         {
-            // The operation is shared with the Debug tab's button, which has the same
-            // job and no chat context of its own; only the wording differs.
             var error = GameActions.TryForceStart();
             if (error != null)
             {
@@ -237,8 +230,6 @@ namespace TownOfRoles.Commands
             ctx.Reply("Force-start requested.");
         }
 
-        // Replies with multi-line text. The chat bubble wraps, so a list of ids is split into
-        // one message per line rather than truncated to the first.
         private static void Reply(ChatCommandContext ctx, string text)
         {
             if (string.IsNullOrEmpty(text)) return;
@@ -270,9 +261,6 @@ namespace TownOfRoles.Commands
             ctx.Reply($"Nickname changed to {name}.");
         }
 
-        // /color gradient and /color rainbow reach the same bodies as /gradient and
-        // /rainbow, with the rest of the arguments rather than a context copy: one
-        // implementation of the toggle, two ways to type it.
         private static void Gradient(ChatCommandContext ctx) => ApplyGradient(ctx, ctx.Args);
 
         private static void Rainbow(ChatCommandContext ctx) => ApplyRainbow(ctx, ctx.Args);
@@ -339,19 +327,14 @@ namespace TownOfRoles.Commands
             if (message.Length > 120)
                 message = message.Substring(0, 120);
 
-            // The host shows the alert directly and broadcasts it through the RPC mux, so the
-            // whole lobby sees the same native popup and the host's own message is not replaced
-            // by a "sent" confirmation. Host-only, so clients cannot impersonate server messages.
             SystemChat.Show(message);
             try { TownOfRolesRpcMux.Send(SystemMessageRpc, message); }
             catch (Exception e) { ctx.Warn("Lobby broadcast failed: " + e.Message); }
         }
 
-        [ReactorRpc(SystemMessageRpc)]
+        [AtomicRpc(SystemMessageRpc)]
         private static void OnSystemMessageRpc(byte senderId, string message)
         {
-            // The host already displayed the message when it broadcast it; only
-            // remote clients display here. Exactly one display per client.
             var client = AmongUsClient.Instance;
             if (client != null && client.AmHost) return;
             if (string.IsNullOrWhiteSpace(message)) return;
@@ -415,8 +398,6 @@ namespace TownOfRoles.Commands
             }
             else
             {
-                // The final token is the role; all preceding tokens form the
-                // player name, so names containing spaces remain addressable.
                 target = ctx.TargetOf(ctx.Args.Take(ctx.Args.Length - 1));
                 roleName = ctx.Args[ctx.Args.Length - 1];
             }
@@ -455,13 +436,10 @@ namespace TownOfRoles.Commands
                 return;
             }
 
-            // Revive is not an RPC, so the local effect above is half the job: without
-            // this the target stays dead on every other client.
             TownOfRolesRpcMux.Send(ReviveRpc, target.PlayerId);
             ctx.Reply($"Revived {ChatCommands.DisplayName(target)}.");
         }
 
-        // Revives the local player, for the Debug tab's button.
         internal static void ReviveLocalPlayer()
         {
             var local = PlayerControl.LocalPlayer;
@@ -470,7 +448,7 @@ namespace TownOfRoles.Commands
             ChatCommands.Write(error ?? "Revived you.");
         }
 
-        [ReactorRpc(ReviveRpc)]
+        [AtomicRpc(ReviveRpc)]
         private static void OnReviveRpc(byte senderId, byte playerId)
         {
             var client = AmongUsClient.Instance;
@@ -488,8 +466,6 @@ namespace TownOfRoles.Commands
 
         private static void AssassinGuess(ChatCommandContext ctx)
         {
-            // Reports whether it took the text: a guess it could not read is ordinary
-            // chat, which is the behaviour this command has always had.
             ctx.Handled = AssassinSystem.TryHandleGuess(ctx.Sender, ctx.Args);
         }
 
@@ -500,8 +476,6 @@ namespace TownOfRoles.Commands
             var error = GameActions.TryCallMeeting(ctx.Sender);
             if (error != null) ctx.Reply(error);
         }
-
-        // Helpers
 
         public static void TickLocalEffects()
         {

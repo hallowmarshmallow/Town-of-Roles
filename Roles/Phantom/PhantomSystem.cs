@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using ClassicUs.Reactor;
+using Atomic;
 using MarshAPI;
 using HarmonyLib;
 using UnityEngine;
@@ -8,7 +8,6 @@ using TownOfRoles.Core;
 
 namespace TownOfRoles.Roles.Phantom
 {
-    // Phantom gameplay logic (ported from Town-Of-Us' Phantom.cs).
     internal static class PhantomSystem
     {
         private const string DeathRpc = "townofroles.PhantomDeath";
@@ -16,12 +15,11 @@ namespace TownOfRoles.Roles.Phantom
 
         private static readonly Color WinColor = new(0.75f, 0.75f, 0.85f, 1f);
 
-        private static readonly HashSet<byte> PhantomDead = new(); // all clients: faded rendering
+        private static readonly HashSet<byte> PhantomDead = new();
 
         public static bool IsPhantom(PlayerControl player) =>
             player != null && player.Data != null && RoleRegistry.IsAssigned(player, PhantomRole.Id);
 
-        // True once the phantom has died (win condition is now live).
         public static bool IsPhantomDead(PlayerControl player) =>
             player != null && PhantomDead.Contains(player.PlayerId);
 
@@ -34,9 +32,6 @@ namespace TownOfRoles.Roles.Phantom
                 CheckWin();
             }
 
-            // Every client (host included): keep dead phantoms faded. The game
-            // restores material colors on cosmetic refreshes, so re-apply
-            // idempotently each tick instead of relying on the one-shot RPC.
             if (PhantomDead.Count > 0)
             {
                 foreach (var id in new List<byte>(PhantomDead))
@@ -67,10 +62,9 @@ namespace TownOfRoles.Roles.Phantom
                 if (player.Data.Tasks == null || player.Data.Tasks.Count == 0) continue;
                 var allDone = true;
                 for (int i = 0; i < player.Data.Tasks.Count; i++)
-                    if (player.Data.Tasks.get_Item(i) == null || !player.Data.Tasks.get_Item(i).Complete) { allDone = false; break; }
+                    if (player.Data.Tasks[i] == null || !player.Data.Tasks[i].Complete) { allDone = false; break; }
                 if (!allDone) continue;
 
-                // The Phantom whose tasks are all done is this round's winner.
                 ModdedWin.Declare(player);
                 ModdedGameOver.Claim("Phantom Wins", WinColor);
                 TownOfRolesRpcMux.Send(WinRpc, player.PlayerId);
@@ -79,7 +73,6 @@ namespace TownOfRoles.Roles.Phantom
             }
         }
 
-        // Semi-transparent body so the phantom can move unseen (host + clients).
         private static void Fade(PlayerControl player)
         {
             if (player == null) return;
@@ -88,10 +81,7 @@ namespace TownOfRoles.Roles.Phantom
                 foreach (var renderer in player.GetComponentsInChildren<Renderer>(true))
                 {
                     if (renderer == null) continue;
-                    // The 2026.9.20 player has Renderer.material only; the materials array is not
-                    // in its metadata the way it was in 2026.9.10, so one material per renderer is
-                    // faded rather than every slot. material (not sharedMaterial) is what keeps the
-                    // tint on this player's body alone.
+
                     var mat = renderer.material;
                     if (mat == null) continue;
                     mat.color = new Color(mat.color.r, mat.color.g, mat.color.b, 0.15f);
@@ -100,7 +90,7 @@ namespace TownOfRoles.Roles.Phantom
             catch { }
         }
 
-        [ReactorRpc(DeathRpc)]
+        [AtomicRpc(DeathRpc)]
         private static void OnDeath(byte senderId, byte phantomId)
         {
             var client = AmongUsClient.Instance;
@@ -109,13 +99,12 @@ namespace TownOfRoles.Roles.Phantom
             Fade(FindPlayer(phantomId));
         }
 
-        [ReactorRpc(WinRpc)]
+        [AtomicRpc(WinRpc)]
         private static void OnWin(byte senderId, byte winnerId)
         {
             var client = AmongUsClient.Instance;
             if (client == null || client.AmHost || senderId != client.HostId) return;
-            // The id travels with the win: each client draws its own end screen, and a
-            // client that only knew "the Phantom won" could not name the player on it.
+
             ModdedWin.Declare(FindPlayer(winnerId));
             ModdedGameOver.Claim("Phantom Wins", WinColor);
         }
@@ -123,8 +112,7 @@ namespace TownOfRoles.Roles.Phantom
         public static void Reset()
         {
             PhantomDead.Clear();
-            // The winner list and the title claim belong to the round that just ended;
-            // the result screen that read them is gone with it.
+
             ModdedWin.Clear();
         }
 
@@ -148,10 +136,6 @@ namespace TownOfRoles.Roles.Phantom
         }
     }
 
-    // The end screen is drawn by MarshAPI's central ModdedGameOver patches; the
-    // Phantom claims its title at its win sites. The per-role EndGameManager patch
-    // pair that used to live here is gone, see MarshAPI/Endgame/ModdedGameOver.cs.
-
     [HarmonyPatch(typeof(ExileController), nameof(ExileController.Begin))]
     internal static class ExileController_Begin_PhantomPatch
     {
@@ -164,14 +148,10 @@ namespace TownOfRoles.Roles.Phantom
                 if (!RoleRegistry.IsAssigned(player, PhantomRole.Id)) return;
                 var text = exiled.PlayerName + " was the Phantom.";
                 if (__instance.Text != null) __instance.Text.Text = text;
-                // completeString is protected in the 2026.8.9 interop.
+
                 GameReflection.SetCompleteString(__instance, text);
                 return;
             }
         }
     }
-
-    // Exile reveal text is re-applied every frame by Core/ExileTextFix, which polls
-    // ExileController.Instance. The old patch targeted a compiler-generated coroutine type
-    // that the interop no longer emits. Never patch coroutine types.
 }

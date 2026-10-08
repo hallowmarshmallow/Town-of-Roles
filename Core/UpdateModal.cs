@@ -5,7 +5,6 @@ using UnityEngine;
 
 namespace TownOfRoles.Core
 {
-    // In-game "Update available" prompt: a title, the message, and Update / Later.
     internal static class UpdateModal
     {
         private const string WindowName = "UpdateModal";
@@ -18,19 +17,16 @@ namespace TownOfRoles.Core
 
         public static bool IsVisible => _window != null && _window.IsVisible;
 
-        // Called from the HudManager.Update patch each frame.
         public static void Poll()
         {
             try
             {
-                // Show the prompt when the async check found a newer version.
                 if (!IsVisible && UpdateSystem.ShouldPromptNow())
                 {
                     Show(UpdateSystem.Latest);
                     return;
                 }
 
-                // Advance the download state machine.
                 if (_downloadTask == null || !IsVisible) return;
                 if (!_downloadTask.IsCompleted) return;
 
@@ -43,8 +39,7 @@ namespace TownOfRoles.Core
 
                 _downloadTask = null;
                 SetMessage(status);
-                // The prompt is answerable again once the attempt has finished,
-                // whichever way it finished.
+
                 _laterButton?.SetVisible(true);
             }
             catch (Exception e)
@@ -125,7 +120,6 @@ namespace TownOfRoles.Core
                 _laterButton?.SetVisible(false);
                 SetMessage("Downloading update…");
 
-                // Started on a background thread; completion is polled in Poll().
                 _downloadTask = System.Threading.Tasks.Task.Run(() => UpdateSystem.DownloadAndStageAsync());
             }
             catch (Exception e)

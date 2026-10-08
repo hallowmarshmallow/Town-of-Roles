@@ -1,14 +1,13 @@
 using System;
 using System.Collections.Generic;
 using BepInEx.Configuration;
-using ClassicUs.Reactor;
+using Atomic;
 using MarshAPI;
 using HarmonyLib;
 using UnityEngine;
 
 namespace TownOfRoles.Core
 {
-    // Creator-exclusive name color: a smooth cycling blue/pink name.
     internal static class CreatorColor
     {
         private const string CreatorClaimRpc = "townofroles.CreatorClaim";
@@ -25,14 +24,8 @@ namespace TownOfRoles.Core
         private static int _claimedPlayerId = -1;
         private static DateTime _nextClaim = DateTime.MinValue;
 
-        // Skipped while the ship/spawn transition is settling (set by GameStarted):
-        // touching player bodies renderer-by-renderer on the frame players spawn
-        // can fault the CLR before the scene has finished constructing them.
         private static float _settleUntil = float.MinValue;
 
-        // Players whose body we tinted this session, so a player who stops
-        // qualifying (game end / disconnect / config toggle) gets their own
-        // palette colors restored instead of staying tinted forever.
         private static readonly HashSet<byte> TintedBodies = new();
 
         public static void Init(ConfigFile config)
@@ -60,34 +53,45 @@ namespace TownOfRoles.Core
 
         public static void OnGameStarted(GameStartedEventArgs _)
         {
-            // Freeze per-frame body touching for a moment so the game can finish
-            // spawning players before we tint anything.
             _settleUntil = Time.unscaledTime + 1.5f;
         }
 
         public static void OnGameEnded(GameEndedEventArgs _)
         {
-            // PlayerIds are re-used between lobbies, so a stale claim must not
-            // leak onto a fresh lobby's PlayerId.
             RestoreTintedBodies();
             _claimedPlayerId = -1;
         }
 
-        [ReactorRpc(CreatorClaimRpc)]
+        [AtomicRpc(CreatorClaimRpc)]
         private static void OnCreatorClaimRpc(byte senderId, string secret)
         {
             var expected = Secret?.Value;
             if (string.IsNullOrEmpty(expected) || string.IsNullOrEmpty(secret)) return;
             if (!string.Equals(expected, secret, StringComparison.Ordinal)) return;
-            _claimedPlayerId = senderId;
+
+            // senderId is a client id, and every other use of this field compares it against
+            // a player id, so storing it raw tinted the wrong player, or nobody.
+            var owner = FindByClientId(senderId);
+            if (owner == null || owner.Data == null) return;
+            _claimedPlayerId = owner.PlayerId;
+        }
+
+        // The player a client id belongs to, or null while that client has no player yet. The
+        // claim is broadcast every 15s, so a miss here is retried rather than lost.
+        private static PlayerControl FindByClientId(byte clientId)
+        {
+            foreach (var player in PlayerControl.AllPlayerControls)
+            {
+                if (player == null) continue;
+                var client = player.GetClient();
+                if (client != null && client.Id == clientId) return player;
+            }
+
+            return null;
         }
 
         [HarmonyPatch(typeof(HudManager), nameof(HudManager.Update))]
-        // Priority.Last: this build's HarmonyX sorts HIGHER priority postfixes
-        // FIRST (PriorityComparer returns -priority.CompareTo(value)), so a High
-        // creator patch would run BEFORE the Normal-priority role-presentation
-        // patch and get its color overwritten every 0.1s, the stepped gradient
-        // seen in-game. Last runs after everything, so the cycling color sticks.
+
         [HarmonyPriority(Priority.Last)]
         internal static class HudManager_Update_CreatorColorPatch
         {
@@ -95,14 +99,12 @@ namespace TownOfRoles.Core
             {
                 if (Enabled?.Value != true)
                 {
-                    // Toggled off live: undo any body tint so nobody stays colored
-                    // until the next game (RestoreUntinted is unreachable here).
                     RestoreTintedBodies();
                     return;
                 }
                 try
                 {
-                    if (Time.unscaledTime < _settleUntil) return; // spawn transition: no body touching yet
+                    if (Time.unscaledTime < _settleUntil) return;
                     var speed = Mathf.Max(0.1f, Speed?.Value ?? 2.5f);
                     var t = (Mathf.Sin(Time.unscaledTime * speed) + 1f) / 2f;
                     var color = Color.Lerp(Blue, Pink, t);
@@ -115,7 +117,6 @@ namespace TownOfRoles.Core
                 }
                 catch
                 {
-                    // Cosmetic only, never let name styling crash gameplay.
                 }
             }
         }
@@ -134,7 +135,6 @@ namespace TownOfRoles.Core
             }
             catch
             {
-                // RPC not available (no lobby); retry on the next interval.
             }
         }
 
@@ -161,7 +161,7 @@ namespace TownOfRoles.Core
             }
 
             var meeting = MeetingHud.Instance;
-            // playerStates is private in the 2026.8.9 interop.
+
             var states = meeting == null ? null : GameReflection.GetPlayerStates(meeting);
             if (states != null)
             {
@@ -178,13 +178,10 @@ namespace TownOfRoles.Core
             RestoreUntinted();
         }
 
-        // Tints the whole player body (body, hat, visor renderers) with the cycling color using
-        // the game's own PlayerMaterial.SetColors, the same path the Camouflager uses for its
-        // grey-out, so the shader stays consistent and hats/pets ride along.
         private static void TintBody(PlayerControl player, Color color)
         {
             if (player == null || player.gameObject == null) return;
-            if (player.Data != null && player.Data.IsDead) return; // ghosts keep their look
+            if (player.Data != null && player.Data.IsDead) return;
             foreach (var renderer in player.GetComponentsInChildren<Renderer>(true))
             {
                 if (renderer == null) continue;
@@ -193,7 +190,6 @@ namespace TownOfRoles.Core
             TintedBodies.Add(player.PlayerId);
         }
 
-        // Restores palette colors on bodies tinted earlier that no longer qualify.
         private static void RestoreUntinted()
         {
             if (TintedBodies.Count == 0) return;
@@ -205,8 +201,7 @@ namespace TownOfRoles.Core
             {
                 var player = FindPlayer(id);
                 if (player == null || player.Data == null) { TintedBodies.Remove(id); continue; }
-                // A dead player is no longer the visible tinted body (ghost look is
-                // preserved by TintBody's dead check), so restore and converge.
+
                 if (player.Data.IsDead) { RestoreBody(player); TintedBodies.Remove(id); continue; }
                 if (ShouldColor(id, player.Data.PlayerName, localId, secret, legacyName)) continue;
                 RestoreBody(player);
@@ -241,15 +236,11 @@ namespace TownOfRoles.Core
             var isSelf = playerId == localId;
             if (isSelf)
             {
-                // You are who you are: a configured secret colors your own name
-                // unconditionally; without one, the legacy name match applies.
                 return !string.IsNullOrEmpty(secret)
                     || (legacyName.Length > 0
                         && string.Equals(playerName, legacyName, StringComparison.OrdinalIgnoreCase));
             }
 
-            // Remote players: only a verified handshake claim (matching THIS
-            // client's secret) or the legacy name match.
             if (playerId == _claimedPlayerId && !string.IsNullOrEmpty(secret)) return true;
             return string.IsNullOrEmpty(secret)
                 && legacyName.Length > 0
@@ -263,9 +254,6 @@ namespace TownOfRoles.Core
             return null;
         }
 
-        // Same interop-drift-safe reflection used by PresentationPatches:
-        // the runtime TextMeshPro/TextRenderer proxies expose "color" even
-        // when the compile-time interop differs.
         private static void SetColor(object renderer, Color value)
         {
             if (renderer == null) return;

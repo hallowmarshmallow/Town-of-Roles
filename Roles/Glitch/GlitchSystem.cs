@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using ClassicUs.Reactor;
+using Atomic;
 using MarshAPI;
 using HarmonyLib;
 using UnityEngine;
@@ -8,7 +8,6 @@ using TownOfRoles.Core;
 
 namespace TownOfRoles.Roles.Glitch
 {
-    // The Glitch gameplay logic (ported from Town-Of-Us' Glitch.cs).
     internal static class GlitchSystem
     {
         private const string MimicRpc = "townofroles.GlitchMimic";
@@ -21,8 +20,7 @@ namespace TownOfRoles.Roles.Glitch
 
         private static readonly Dictionary<byte, DateTime> MimicUntil = new();
         private static readonly Dictionary<byte, DateTime> HackUntil = new();
-        // Independent cooldowns per ability (the OG role has three separate
-        // buttons with three separate timers).
+
         private static readonly Dictionary<byte, DateTime> MimicCooldowns = new();
         private static readonly Dictionary<byte, DateTime> HackCooldowns = new();
         private static readonly Dictionary<byte, DateTime> KillCooldowns = new();
@@ -36,7 +34,6 @@ namespace TownOfRoles.Roles.Glitch
         public static bool IsHacked(PlayerControl player) =>
             player != null && player.Data != null && HackUntil.TryGetValue(player.PlayerId, out var until) && DateTime.UtcNow < until;
 
-        // Mimic
         internal static bool CanMimicNow(PlayerControl glitch)
         {
             if (!IsGlitch(glitch) || glitch.Data == null || glitch.Data.IsDead) return false;
@@ -71,7 +68,6 @@ namespace TownOfRoles.Roles.Glitch
             TownOfRolesRpcMux.Send(MimicRpc, glitch.PlayerId, targetName, targetColor);
         }
 
-        // Hack
         internal static bool CanHackNow(PlayerControl glitch)
         {
             if (!IsGlitch(glitch) || glitch.Data == null || glitch.Data.IsDead) return false;
@@ -97,7 +93,6 @@ namespace TownOfRoles.Roles.Glitch
             TownOfRolesRpcMux.Send(HackRpc, target.PlayerId);
         }
 
-        // Kill
         internal static bool CanKillNow(PlayerControl glitch)
         {
             if (!IsGlitch(glitch) || glitch.Data == null || glitch.Data.IsDead) return false;
@@ -123,7 +118,6 @@ namespace TownOfRoles.Roles.Glitch
             TownOfRolesRpcMux.Send(KillRpc, target.PlayerId);
         }
 
-        // Round lifecycle / pool
         public static void OnGameStarted(GameStartedEventArgs _) => Reset();
 
         public static void Reset()
@@ -138,7 +132,6 @@ namespace TownOfRoles.Roles.Glitch
 
         public static void OnGameEnded(GameEndedEventArgs _) { }
 
-        // Host tick: revert expired mimics, and run the elimination win check.
         public static void Tick()
         {
             var client = AmongUsClient.Instance;
@@ -167,11 +160,10 @@ namespace TownOfRoles.Roles.Glitch
                 ApplyName(glitch, ownName);
                 Recolor(glitch, ownColor);
                 TownOfRolesRpcMux.Send("townofroles.GlitchRevert", key, ownName, ownColor);
-                return; // one revert per tick is plenty
+                return;
             }
         }
 
-        // The Glitch wins when every other living player is dead.
         private static void CheckEliminationWin()
         {
             if (ModdedGameOver.HasClaim || ShipStatus.Instance == null) return;
@@ -190,8 +182,7 @@ namespace TownOfRoles.Roles.Glitch
             ShipStatus.Instance.StartEndGame(GameOverReason.Custom, 0.5f);
         }
 
-        // RPCs
-        [ReactorRpc(RequestMimicRpc)]
+        [AtomicRpc(RequestMimicRpc)]
         private static void OnRequestMimic(byte senderId, byte playerId)
         {
             var client = AmongUsClient.Instance;
@@ -208,7 +199,7 @@ namespace TownOfRoles.Roles.Glitch
             }
         }
 
-        [ReactorRpc(RequestHackRpc)]
+        [AtomicRpc(RequestHackRpc)]
         private static void OnRequestHack(byte senderId, byte playerId)
         {
             var client = AmongUsClient.Instance;
@@ -225,7 +216,7 @@ namespace TownOfRoles.Roles.Glitch
             }
         }
 
-        [ReactorRpc(RequestKillRpc)]
+        [AtomicRpc(RequestKillRpc)]
         private static void OnRequestKill(byte senderId, byte playerId)
         {
             var client = AmongUsClient.Instance;
@@ -242,19 +233,18 @@ namespace TownOfRoles.Roles.Glitch
             }
         }
 
-        [ReactorRpc(MimicRpc)]
+        [AtomicRpc(MimicRpc)]
         private static void OnMimic(byte senderId, byte glitchId, string targetName, int targetColor)
         {
             var client = AmongUsClient.Instance;
             if (client == null || client.AmHost || senderId != client.HostId) return;
             var glitch = FindPlayer(glitchId);
             if (glitch == null) return;
-            // The name already arrived through the host's RpcSetName broadcast;
-            // clients only need to recolor the body.
+
             Recolor(glitch, targetColor);
         }
 
-        [ReactorRpc("townofroles.GlitchRevert")]
+        [AtomicRpc("townofroles.GlitchRevert")]
         private static void OnRevert(byte senderId, byte glitchId, string ownName, int ownColor)
         {
             var client = AmongUsClient.Instance;
@@ -264,7 +254,7 @@ namespace TownOfRoles.Roles.Glitch
             Recolor(glitch, ownColor);
         }
 
-        [ReactorRpc(HackRpc)]
+        [AtomicRpc(HackRpc)]
         private static void OnHack(byte senderId, byte targetId)
         {
             var client = AmongUsClient.Instance;
@@ -276,15 +266,12 @@ namespace TownOfRoles.Roles.Glitch
                 Local("You have been hacked! You cannot report bodies or do tasks.");
         }
 
-        [ReactorRpc(KillRpc)]
+        [AtomicRpc(KillRpc)]
         private static void OnKill(byte senderId, byte targetId)
         {
-            // KillManager.Kill is already networked host-authoritative; the
-            // companion RPC exists only to keep client-side kill tables in sync
-            // for future hacking/guessing features.
         }
 
-        [ReactorRpc(WinRpc)]
+        [AtomicRpc(WinRpc)]
         private static void OnWin(byte senderId)
         {
             var client = AmongUsClient.Instance;
@@ -292,20 +279,12 @@ namespace TownOfRoles.Roles.Glitch
             ModdedGameOver.Claim("The Glitch Wins", WinColor);
         }
 
-        // Hack suppression hooks
-        // GameEvents.BeforeReport hook: a hacked player cannot report bodies.
         public static void OnBeforeReport(ReportEventArgs args)
         {
             if (args.IsEmergencyMeeting || args.Reporter == null) return;
             if (IsHacked(args.Reporter)) args.Cancelled = true;
         }
 
-        // End screen
-        // Drawn by MarshAPI's central ModdedGameOver patches; the Glitch claims its
-        // title at its win sites. The per-role EndGameManager patch pair that used to
-        // live here is gone, see MarshAPI/Endgame/ModdedGameOver.cs.
-
-        // Visual helpers (shared with Morphling)
         private static void ApplyName(PlayerControl player, string name)
         {
             if (player == null || string.IsNullOrEmpty(name)) return;
@@ -344,10 +323,8 @@ namespace TownOfRoles.Roles.Glitch
             return null;
         }
 
-        // Seconds this Glitch's mimic still runs for, zero when it is not up.
         public static float MimicSecondsRemaining(PlayerControl glitch) => SecondsLeft(MimicUntil, glitch);
 
-        // Seconds this Glitch's hack still runs for, zero when it is not up.
         public static float HackSecondsRemaining(PlayerControl glitch) => SecondsLeft(HackUntil, glitch);
 
         private static float SecondsLeft(Dictionary<byte, DateTime> table, PlayerControl player)
@@ -361,8 +338,6 @@ namespace TownOfRoles.Roles.Glitch
         private static DateTime GetCooldown(byte glitchId, Dictionary<byte, DateTime> table) =>
             table.TryGetValue(glitchId, out var value) ? value : DateTime.MinValue;
 
-        // Seconds until the Glitch's kill is ready, for the HUD digits, the same table
-        // CanKillNow gates on.
         internal static float SecondsUntilKillReady(PlayerControl glitch)
         {
             if (glitch == null || glitch.Data == null) return 0f;
@@ -380,9 +355,6 @@ namespace TownOfRoles.Roles.Glitch
         }
     }
 
-    // (The old EndGameManager Update/SetEverythingUp Glitch patches are gone, 
-    // MarshAPI's central ModdedGameOver pair draws the end screen for every role.)
-
     [HarmonyPatch(typeof(ExileController), nameof(ExileController.Begin))]
     internal static class ExileController_Begin_GlitchPatch
     {
@@ -395,15 +367,10 @@ namespace TownOfRoles.Roles.Glitch
                 if (!RoleRegistry.IsAssigned(player, GlitchRole.Id)) return;
                 var text = exiled.PlayerName + " was The Glitch.";
                 if (__instance.Text != null) __instance.Text.Text = text;
-                // completeString is protected in the 2026.8.9 interop.
+
                 GameReflection.SetCompleteString(__instance, text);
                 return;
             }
         }
     }
-
-    // Exile reveal text is re-applied every frame by Core/ExileTextFix, which polls
-    // ExileController.Instance. The old patch targeted a compiler-generated coroutine type
-    // that the interop no longer emits. Never patch coroutine types.
-
 }

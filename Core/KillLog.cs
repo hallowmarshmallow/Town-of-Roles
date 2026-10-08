@@ -1,12 +1,11 @@
 using System;
 using System.Collections.Generic;
-using ClassicUs.Reactor;
+using Atomic;
 using MarshAPI;
 using TownOfRoles.Core;
 
 namespace TownOfRoles.Core
 {
-    // Cross-client log of every murder this round: (victim, killer, time).
     internal static class KillLog
     {
         public struct KillEntry
@@ -21,7 +20,6 @@ namespace TownOfRoles.Core
 
         public static IReadOnlyList<KillEntry> All => Entries;
 
-        // Most recent record for a victim, if any.
         public static bool TryGetLatest(byte victimId, out KillEntry entry)
         {
             entry = default;
@@ -34,7 +32,6 @@ namespace TownOfRoles.Core
             return found;
         }
 
-        // GameEvents.AfterMurder hook, subscribed in TownOfRolesPlugin.Load().
         public static void OnAfterMurder(MurderEventArgs args)
         {
             if (args?.Target == null || args.Killer == null) return;
@@ -47,12 +44,12 @@ namespace TownOfRoles.Core
         private static void Add(byte victim, byte killer) =>
             Entries.Add(new KillEntry { Victim = victim, Killer = killer, Time = DateTime.UtcNow });
 
-        [ReactorRpc(RpcKey)]
+        [AtomicRpc(RpcKey)]
         private static void OnRecord(byte senderId, byte victim, byte killer)
         {
             var client = AmongUsClient.Instance;
             if (client == null || client.AmHost || senderId != client.HostId) return;
-            // Skip if the local AfterMurder already recorded this exact kill.
+
             if (TryGetLatest(victim, out var existing) &&
                 existing.Killer == killer &&
                 (DateTime.UtcNow - existing.Time).TotalSeconds < 2.0) return;

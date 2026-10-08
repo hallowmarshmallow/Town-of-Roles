@@ -4,8 +4,6 @@ using TownOfRoles.Core;
 
 namespace TownOfRoles.Roles.Snitch
 {
-    // Snitch, a Crewmate who sees arrows to the Impostors once all tasks are complete. Ported
-    // from the original Town-Of-Us Snitch role.
     internal sealed class SnitchRole : CustomCrewmateRole
     {
         public const string Id = "townofroles.Snitch";

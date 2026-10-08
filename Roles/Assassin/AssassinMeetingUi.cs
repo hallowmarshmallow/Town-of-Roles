@@ -29,7 +29,7 @@ namespace TownOfRoles.Roles.Assassin
             if (!AssassinSystem.IsAssassin(assassin) || assassin.Data.IsDead) return;
 
             Clear();
-            // playerStates is private in the 2026.8.9 interop, reflection adapter.
+
             var states = GameReflection.GetPlayerStates(meeting);
             if (states == null) return;
             foreach (var area in states)
@@ -61,9 +61,7 @@ namespace TownOfRoles.Roles.Assassin
                 if (area.Buttons == null || area.Buttons.transform.childCount == 0) return;
                 var template = area.Buttons.transform.GetChild(0).gameObject;
                 if (template == null) return;
-                // Preserve mode: these are native vote buttons, so they keep their
-                // components; the click goes through UiRuntime's prefix, which is
-                // why the inherited OnClick listener is left in place.
+
                 var cycle = UiClone.Clone(template, area.transform, new UiCloneOptions
                 {
                     Name = "TownOfRoles_AssassinCycle_" + target.PlayerId,
@@ -173,11 +171,7 @@ namespace TownOfRoles.Roles.Assassin
         {
             var passive = button.GetComponent<PassiveButton>() ?? button.GetComponentInChildren<PassiveButton>(true);
             if (passive == null || button == null) return;
-            // Delegate-free click dispatch (see UiRuntime): name this button's
-            // PassiveButton GameObject with the unique id and route the native
-            // ReceiveClickDown pipeline through the UiRuntime. OnClick is
-            // deliberately left untouched, marshalling a managed UnityAction
-            // triggers the game's protection.
+
             passive.gameObject.name = button.name;
             UiRuntime.Register(button.name, () =>
             {

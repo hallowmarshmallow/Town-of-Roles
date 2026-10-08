@@ -14,7 +14,7 @@ namespace TownOfRoles.Roles.Medic
         public override int Count => RoleConfig.Count(RoleConfig.MedicCount);
         public override float RoleChancePercent => RoleConfig.Chance(RoleConfig.MedicChance);
         public override string DescriptionShort => "Protect a player once.";
-        // Medic uses a dedicated MarshAPI ability button, not the native Kill button.
+
         public override string KillAbilityName => string.Empty;
         public override Color TeamColor => new(0.3f, 0.95f, 0.55f, 1f);
     }

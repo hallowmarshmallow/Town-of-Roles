@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using ClassicUs.Reactor;
+using Atomic;
 using MarshAPI;
 using TownOfRoles.Core;
 using UnityEngine;
@@ -20,12 +20,9 @@ namespace TownOfRoles.Roles.Vigilante
         internal static bool CanShootNow(PlayerControl vigilante) =>
             CanShoot(vigilante) && ClosestPlayerFinder.GetClosestTarget(vigilante, out _);
 
-        // Shots left for a player, for the HUD counter. The same value CanShoot gates on, so
-        // the counter cannot disagree with whether the button fires.
         internal static int RemainingUses(PlayerControl vigilante) =>
             vigilante == null || vigilante.Data == null ? 0 : GetShots(vigilante.PlayerId);
 
-        // Seconds until the next shot, for the HUD digits, the same clock CanShoot gates on.
         internal static float SecondsRemaining(PlayerControl vigilante)
         {
             if (vigilante == null || vigilante.Data == null) return 0f;
@@ -79,7 +76,7 @@ namespace TownOfRoles.Roles.Vigilante
         public static void OnGameStarted(GameStartedEventArgs _) => Reset();
         public static void OnGameEnded(GameEndedEventArgs _) => Reset();
 
-        [ReactorRpc(RequestShotRpc)]
+        [AtomicRpc(RequestShotRpc)]
         private static void OnRequestShotRpc(byte senderId, byte playerId)
         {
             var client = AmongUsClient.Instance;
@@ -96,7 +93,7 @@ namespace TownOfRoles.Roles.Vigilante
             }
         }
 
-        [ReactorRpc(ShotRpc)]
+        [AtomicRpc(ShotRpc)]
         private static void OnShotRpc(byte senderId, byte vigilanteId, byte playerId, bool enemy, int shotsRemaining)
         {
             var client = AmongUsClient.Instance;

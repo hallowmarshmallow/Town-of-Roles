@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using ClassicUs.Reactor;
+using Atomic;
 using MarshAPI;
 using HarmonyLib;
 using UnityEngine;
@@ -9,7 +9,6 @@ using TownOfRoles.Roles.Spy;
 
 namespace TownOfRoles.Roles.Arsonist
 {
-    // Arsonist gameplay logic (ported from Town-Of-Us' Arsonist.cs).
     internal static class ArsonistSystem
     {
         private const string DouseRpc = "townofroles.ArsonistDouse";
@@ -49,7 +48,7 @@ namespace TownOfRoles.Roles.Arsonist
             }
             if (!CanDouseNow(arsonist)) return;
             if (!ClosestPlayerFinder.GetClosestTarget(arsonist, out var target)) return;
-            if (!Doused.Add(target.PlayerId)) return; // already doused
+            if (!Doused.Add(target.PlayerId)) return;
 
             Cooldowns[arsonist.PlayerId] = DateTime.UtcNow.AddSeconds(RoleConfig.Seconds(RoleConfig.ArsonistDouseCooldown, 10f));
             TownOfRolesRpcMux.Send(DouseRpc, target.PlayerId);
@@ -80,7 +79,6 @@ namespace TownOfRoles.Roles.Arsonist
             TownOfRolesRpcMux.Send(IgniteRpc);
         }
 
-        // Round lifecycle / pool
         public static void OnGameStarted(GameStartedEventArgs _) => Reset();
 
         public static void Reset()
@@ -99,7 +97,6 @@ namespace TownOfRoles.Roles.Arsonist
             CheckEliminationWin();
         }
 
-        // The Arsonist wins when every other living player is dead.
         private static void CheckEliminationWin()
         {
             if (ModdedGameOver.HasClaim || ShipStatus.Instance == null) return;
@@ -118,8 +115,7 @@ namespace TownOfRoles.Roles.Arsonist
             ShipStatus.Instance.StartEndGame(GameOverReason.Custom, 0.5f);
         }
 
-        // RPCs
-        [ReactorRpc(RequestDouseRpc)]
+        [AtomicRpc(RequestDouseRpc)]
         private static void OnRequestDouse(byte senderId, byte playerId)
         {
             var client = AmongUsClient.Instance;
@@ -136,7 +132,7 @@ namespace TownOfRoles.Roles.Arsonist
             }
         }
 
-        [ReactorRpc(RequestIgniteRpc)]
+        [AtomicRpc(RequestIgniteRpc)]
         private static void OnRequestIgnite(byte senderId, byte playerId)
         {
             var client = AmongUsClient.Instance;
@@ -153,7 +149,7 @@ namespace TownOfRoles.Roles.Arsonist
             }
         }
 
-        [ReactorRpc(DouseRpc)]
+        [AtomicRpc(DouseRpc)]
         private static void OnDouse(byte senderId, byte targetId)
         {
             var client = AmongUsClient.Instance;
@@ -161,7 +157,7 @@ namespace TownOfRoles.Roles.Arsonist
             Doused.Add(targetId);
         }
 
-        [ReactorRpc(IgniteRpc)]
+        [AtomicRpc(IgniteRpc)]
         private static void OnIgnite(byte senderId)
         {
             var client = AmongUsClient.Instance;
@@ -169,18 +165,13 @@ namespace TownOfRoles.Roles.Arsonist
             Doused.Clear();
         }
 
-        [ReactorRpc(WinRpc)]
+        [AtomicRpc(WinRpc)]
         private static void OnWin(byte senderId)
         {
             var client = AmongUsClient.Instance;
             if (client == null || client.AmHost || senderId != client.HostId) return;
             ModdedGameOver.Claim("Arsonist Wins", WinColor);
         }
-
-        // End screen
-        // Drawn by MarshAPI's central ModdedGameOver patches; the Arsonist claims its
-        // title at its win sites. The per-role EndGameManager patch pair that used to
-        // live here is gone, see MarshAPI/Endgame/ModdedGameOver.cs.
 
         private static PlayerControl FindPlayer(byte playerId)
         {
@@ -202,9 +193,6 @@ namespace TownOfRoles.Roles.Arsonist
         }
     }
 
-    // (The old EndGameManager Update/SetEverythingUp Arsonist patches are gone, 
-    // MarshAPI's central ModdedGameOver pair draws the end screen for every role.)
-
     [HarmonyPatch(typeof(ExileController), nameof(ExileController.Begin))]
     internal static class ExileController_Begin_ArsonistPatch
     {
@@ -217,15 +205,10 @@ namespace TownOfRoles.Roles.Arsonist
                 if (!RoleRegistry.IsAssigned(player, ArsonistRole.Id)) return;
                 var text = exiled.PlayerName + " was the Arsonist.";
                 if (__instance.Text != null) __instance.Text.Text = text;
-                // completeString is protected in the 2026.8.9 interop.
+
                 GameReflection.SetCompleteString(__instance, text);
                 return;
             }
         }
     }
-
-    // Exile reveal text is re-applied every frame by Core/ExileTextFix, which polls
-    // ExileController.Instance. The old patch targeted a compiler-generated coroutine type
-    // that the interop no longer emits. Never patch coroutine types.
-
 }

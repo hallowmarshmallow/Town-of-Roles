@@ -5,9 +5,6 @@ namespace TownOfRoles.Core
 {
     internal static class VisualEffects
     {
-        // The "hallowmarsh" gradient: the creator's smooth blue/pink cycling
-        // color, hardcoded here and applied to the local player's body renderers
-        // via the game's own PlayerMaterial path (same one the Camouflager uses).
         private static readonly Color GradientBlue = new(0.30f, 0.62f, 1f, 1f);
         private static readonly Color GradientPink = new(1f, 0.45f, 0.62f, 1f);
         private const float GradientSpeed = 2.5f;
@@ -75,8 +72,6 @@ namespace TownOfRoles.Core
 
             if (_rainbow)
             {
-                // Native PlayerColorSetter.Update() animates the hue. Do not call
-                // SetColor here, which would overwrite the native rainbow mode.
                 if (_rainbowSetter == null)
                     _rainbowSetter = local.GetComponent<PlayerColorSetter>();
                 if (_rainbowSetter != null)
@@ -84,7 +79,6 @@ namespace TownOfRoles.Core
                 return;
             }
 
-            // Smooth blue/pink hallowmarsh gradient, re-tinted every FixedUpdate.
             RememberVanillaColor(local);
             var t = (Mathf.Sin(Time.unscaledTime * GradientSpeed) + 1f) / 2f;
             var color = Color.Lerp(GradientBlue, GradientPink, t);

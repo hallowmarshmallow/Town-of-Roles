@@ -1,13 +1,12 @@
 using System;
 using System.Collections.Generic;
-using ClassicUs.Reactor;
+using Atomic;
 using MarshAPI;
 using TownOfRoles.Core;
 using UnityEngine;
 
 namespace TownOfRoles.Roles.Janitor
 {
-    // Janitor gameplay logic (ported from Town-Of-Us' Janitor.cs).
     internal static class JanitorSystem
     {
         private const string CleanRpc = "townofroles.JanitorClean";
@@ -44,11 +43,10 @@ namespace TownOfRoles.Roles.Janitor
         private static DateTime GetCooldown(byte janitorId) =>
             Cooldowns.TryGetValue(janitorId, out var value) ? value : DateTime.MinValue;
 
-        // Nearest unreported dead body within vanilla kill distance.
         private static DeadBody FindClosestBody(PlayerControl player)
         {
             if (player == null || player.Data == null) return null;
-            if (PlayerControl.GameOptions == null) return null; // lobby / pre-game frames
+            if (PlayerControl.GameOptions == null) return null;
             var origin = player.GetTruePosition();
             var killDistance = GameOptionsData.KillDistances[PlayerControl.GameOptions.KillDistance];
             DeadBody best = null;
@@ -74,7 +72,7 @@ namespace TownOfRoles.Roles.Janitor
             UnityEngine.Object.Destroy(body.gameObject);
         }
 
-        [ReactorRpc(RequestCleanRpc)]
+        [AtomicRpc(RequestCleanRpc)]
         private static void OnRequestClean(byte senderId, byte playerId)
         {
             var client = AmongUsClient.Instance;
@@ -91,7 +89,7 @@ namespace TownOfRoles.Roles.Janitor
             }
         }
 
-        [ReactorRpc(CleanRpc)]
+        [AtomicRpc(CleanRpc)]
         private static void OnClean(byte senderId, byte parentId)
         {
             var client = AmongUsClient.Instance;

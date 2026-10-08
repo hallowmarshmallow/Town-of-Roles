@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using ClassicUs.Reactor;
+using Atomic;
 using HarmonyLib;
 using MarshAPI;
 using UnityEngine;
@@ -8,7 +8,6 @@ using TownOfRoles.Core;
 
 namespace TownOfRoles.Roles.Camouflager
 {
-    // Camouflager gameplay logic (ported from Town-Of-Us' Camouflager.cs).
     internal static class CamouflagerSystem
     {
         private const string StartRpc = "townofroles.CamouflageStart";
@@ -21,9 +20,6 @@ namespace TownOfRoles.Roles.Camouflager
         public static bool IsCamouflager(PlayerControl player) =>
             player != null && player.Data != null && RoleRegistry.IsAssigned(player, CamouflagerRole.Id);
 
-        // True while the round-wide camouflage is live. Presentation layers (role name lines,
-        // Snitch red plates) must check this before writing anything into nameText, they run at
-        // 10 Hz and would otherwise overwrite the blanked names within a frame.
         internal static bool IsActive => _camoActive && DateTime.UtcNow < _camoUntil;
 
         internal static bool CanCamouflageNow(PlayerControl camouflager)
@@ -51,7 +47,6 @@ namespace TownOfRoles.Roles.Camouflager
             TownOfRolesRpcMux.Send(StartRpc, duration);
         }
 
-        // Runs every frame on every client: keep the grey while active, restore once on expiry.
         public static void Tick()
         {
             if (!_camoActive) return;
@@ -69,8 +64,7 @@ namespace TownOfRoles.Roles.Camouflager
             foreach (var player in PlayerControl.AllPlayerControls)
             {
                 if (player == null) continue;
-                // Blank the overhead name too (Town-Of-Us Utils.Camouflage sets
-                // nameText.text = ""), grey bodies alone don't hide identities.
+
                 try { if (player.nameText != null) player.nameText.text = string.Empty; } catch { }
                 foreach (var renderer in player.GetComponentsInChildren<Renderer>(true))
                 {
@@ -78,11 +72,6 @@ namespace TownOfRoles.Roles.Camouflager
                     try { PlayerMaterial.SetColors(Palette.DisabledGrey, renderer); } catch { }
                 }
 
-                // The grey wash only recolors, a red hat is a grey hat, and still a
-                // silhouette that identifies the wearer. Strip the cosmetics that
-                // carry identity through the game's own outfit setters, and restore
-                // from PlayerInfo afterwards (HatId/SkinId/PetId are the authoritative
-                // current values, so a Morphling mid-morph reverts to their morph).
                 HideOutfit(player);
             }
         }
@@ -93,9 +82,7 @@ namespace TownOfRoles.Roles.Camouflager
             {
                 if (player == null || player.Data == null) continue;
                 var colorId = player.Data.ColorId;
-                // Restore the overhead name from GameData (also undoes a blanked
-                // name; Morphling-style RpcSetName changes live in the same field,
-                // so Data.PlayerName is always the authoritative current value).
+
                 try
                 {
                     if (player.nameText != null && !string.IsNullOrEmpty(player.Data.PlayerName))
@@ -112,15 +99,10 @@ namespace TownOfRoles.Roles.Camouflager
             }
         }
 
-        // Renders every player's hat, skin and pet invisible for the camouflage.
         private static void HideOutfit(PlayerControl player)
         {
-            // Hat: HatParent.SetEnabled toggles its renderers (the game's own switch).
             try { player.HatRenderer?.SetEnabled(false); } catch { }
 
-            // Skin: XMLSkinAnimator rides PlayerControl.XMLSkin and draws the outfit
-            // sprite (SkinRend). Hiding the renderer is the visual-only equivalent of
-            // the game's own "no skin" state.
             try
             {
                 var skinRend = player.XMLSkin?.SkinRend;
@@ -128,11 +110,9 @@ namespace TownOfRoles.Roles.Camouflager
             }
             catch { }
 
-            // Pet: a whole GameObject with its own animator; deactivate it outright.
             try { if (player.CurrentPet != null) player.CurrentPet.gameObject.SetActive(false); } catch { }
         }
 
-        // Undoes HideOutfit from what PlayerInfo still holds.
         private static void RestoreOutfit(PlayerControl player)
         {
             try { player.HatRenderer?.SetEnabled(true); } catch { }
@@ -145,14 +125,13 @@ namespace TownOfRoles.Roles.Camouflager
             try { if (player.CurrentPet != null) player.CurrentPet.gameObject.SetActive(true); } catch { }
         }
 
-        // While the camouflage is live, keep the game's hat updater from re-enabling the hat.
         [HarmonyPatch(typeof(HatParent), nameof(HatParent.LateUpdate))]
         internal static class HatParent_LateUpdate_CamouflagePatch
         {
             private static bool Prefix() => !IsActive;
         }
 
-        [ReactorRpc(RequestRpc)]
+        [AtomicRpc(RequestRpc)]
         private static void OnRequest(byte senderId, byte playerId)
         {
             var client = AmongUsClient.Instance;
@@ -169,7 +148,7 @@ namespace TownOfRoles.Roles.Camouflager
             }
         }
 
-        [ReactorRpc(StartRpc)]
+        [AtomicRpc(StartRpc)]
         private static void OnStart(byte senderId, float duration)
         {
             var client = AmongUsClient.Instance;
@@ -179,7 +158,6 @@ namespace TownOfRoles.Roles.Camouflager
             ApplyCamo();
         }
 
-        // Seconds until this Camouflager may camouflage again, zero when ready.
         public static float SecondsRemaining(PlayerControl camouflager)
         {
             if (camouflager == null || camouflager.Data == null) return 0f;
@@ -188,7 +166,6 @@ namespace TownOfRoles.Roles.Camouflager
             return left > 0 ? (float)left : 0f;
         }
 
-        // Seconds the running camouflage still lasts, zero when it is not up.
         public static float ActiveSecondsRemaining
         {
             get
@@ -204,8 +181,6 @@ namespace TownOfRoles.Roles.Camouflager
 
         public static void Reset()
         {
-            // Never leave everyone grey: restore each player's own colors before
-            // clearing state (meeting start / round end while camo is active).
             if (_camoActive) RestoreAll();
             Cooldowns.Clear();
             _camoActive = false;

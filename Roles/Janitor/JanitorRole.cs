@@ -4,8 +4,6 @@ using TownOfRoles.Core;
 
 namespace TownOfRoles.Roles.Janitor
 {
-    // Janitor, an Impostor who can clean dead bodies so they cannot be reported. Ported from
-    // the original Town-Of-Us Janitor role.
     internal sealed class JanitorRole : CustomImpostorRole
     {
         public const string Id = "townofroles.Janitor";

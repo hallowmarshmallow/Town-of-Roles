@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
-using ClassicUs.Reactor;
+using Atomic;
 using MarshAPI;
 using HarmonyLib;
 using UnityEngine;
@@ -11,19 +11,16 @@ using TownOfRoles.Roles.Engineer;
 
 namespace TownOfRoles.Roles.Lovers
 {
-    // Lovers, ported from Town-Of-Us' LoversMod/.
     internal static class LoverSystem
     {
         private const string PairsRpc = "townofroles.LoversPairs";
         private const string EndRpc = "townofroles.LoversEnd";
         private const int MaxRetries = 300;
 
-        // Seconds to wait after a round starts before picking the pair.
         private const float SettleSeconds = 2.5f;
 
-        // playerId -> partnerId. Symmetric: both directions are present.
         private static readonly Dictionary<byte, byte> Partners = new();
-        // Lovers already killed by heartbreak, so a slow kill can't fire twice.
+
         private static readonly HashSet<byte> Heartbroken = new();
 
         private static bool _impostorLover;
@@ -34,7 +31,6 @@ namespace TownOfRoles.Roles.Lovers
 
         public static bool Enabled => RoleConfig.Lovers?.Value == true;
 
-        // True once a pair (host) or the pair table (client) is live.
         public static bool HasPair => Partners.Count > 0;
 
         public static bool IsLover(PlayerControl player) =>
@@ -47,7 +43,6 @@ namespace TownOfRoles.Roles.Lovers
         public static PlayerControl PartnerOf(PlayerControl player) =>
             player == null || player.Data == null ? null : FindPlayer(Partners.TryGetValue(player.Data.PlayerId, out var id) ? id : (byte?)null);
 
-        // Lifecycle
         public static void OnGameStarted(GameStartedEventArgs _)
         {
             Reset();
@@ -67,7 +62,6 @@ namespace TownOfRoles.Roles.Lovers
             _loggedAssignment = false;
         }
 
-        // Per frame upkeep (host logic)
         public static void Tick()
         {
             var client = AmongUsClient.Instance;
@@ -82,14 +76,11 @@ namespace TownOfRoles.Roles.Lovers
             if (RoleConfig.LoversBothDie?.Value != false) EnforceDiesTogether();
         }
 
-        // Assignment (host)
         private static void TryAssignPairs()
         {
             if (RoleManager.Instance == null) return;
             if (PlayerControl.AllPlayerControls == null || PlayerControl.AllPlayerControls.Count == 0) return;
 
-            // Wait until the game's own role pass has given everyone a role:
-            // picking lovers mid-transition races the native assignment.
             foreach (var player in PlayerControl.AllPlayerControls)
             {
                 if (player == null || player.Data == null) continue;
@@ -107,13 +98,10 @@ namespace TownOfRoles.Roles.Lovers
             foreach (var player in PlayerControl.AllPlayerControls)
             {
                 if (player == null || player.Data == null || player.Data.Disconnected || player.Data.IsDead) continue;
-                if (RoleRegistry.HasOverlay(player, LoverRole.Id)) continue; // already a lover
+                if (RoleRegistry.HasOverlay(player, LoverRole.Id)) continue;
 
                 var team = player.Data.myRole == null ? (RoleTeamTypes?)null : player.Data.myRole.RoleTeamType;
-                // Upstream picks the pair from the crewmates left after the role holder-ups, so
-                // unclaimed players are preferred. Every role here defaults to enabled, which can
-                // leave no unclaimed player at all, so role holders are kept as a fallback: an
-                // overlay never touches the underlying role, team or abilities.
+
                 var claimed = RoleRegistry.HasAnyCustomRole(player);
                 if (team == RoleTeamTypes.Impostor)
                 {
@@ -131,8 +119,6 @@ namespace TownOfRoles.Roles.Lovers
                 impostors.AddRange(spareImpostors);
             }
 
-            // Upstream picks from the crewmate pool and only ever adds at most
-            // one Impostor per pair, so a pair is always anchored by a Crewmate.
             if (crewmates.Count < 2) { _assigned = true; return; }
 
             Shuffle(crewmates);
@@ -200,7 +186,7 @@ namespace TownOfRoles.Roles.Lovers
             catch { }
         }
 
-        [ReactorRpc(PairsRpc)]
+        [AtomicRpc(PairsRpc)]
         private static void OnPairsRpc(byte senderId, string payload, bool impostorInvolved)
         {
             var client = AmongUsClient.Instance;
@@ -255,7 +241,6 @@ namespace TownOfRoles.Roles.Lovers
             return Partners.Count > 0;
         }
 
-        // Both lovers die (host)
         private static void EnforceDiesTogether()
         {
             if (Partners.Count == 0) return;
@@ -271,9 +256,6 @@ namespace TownOfRoles.Roles.Lovers
             }
         }
 
-        // Kills the surviving lover the way upstream does: they murder themselves, so the body
-        // simply drops where they stood. Teleport is off because killer and target are the same
-        // player.
         private static void Heartbreak(PlayerControl victim)
         {
             if (victim == null || victim.Data == null) return;
@@ -286,22 +268,18 @@ namespace TownOfRoles.Roles.Lovers
             catch (Exception e) { Log("heartbreak: " + e.Message); }
         }
 
-        // End criteria (host)
-        // Called from a ShipStatus.CheckEndCriteria prefix.
         public static bool TryHandleEndCriteria()
         {
             if (Partners.Count == 0) return false;
             var ship = ShipStatus.Instance;
             if (ship == null) return false;
 
-            // A critical sabotage is still an ending: never block vanilla for it.
             try { if (EngineerAbility.IsSabotageActive()) return false; }
             catch { }
 
             var alive = AlivePlayers();
             if (alive.Count == 0) return false;
 
-            // Both directions exist in the table, so this counts each lover once.
             var loversAlive = 0;
             foreach (var entry in Partners)
             {
@@ -312,13 +290,8 @@ namespace TownOfRoles.Roles.Lovers
             var allLoversAlive = loversAlive == Partners.Count;
             if (allLoversAlive)
             {
-                // 2 Impostors vs 2 Crewmates with an Impostor lover: vanilla
-                // hands the Impostors the win. Suppress it so the couple can
-                // still reach their own ending.
                 if (_impostorLover && alive.Count == Partners.Count + 2) return true;
 
-                // Both lovers alive with only themselves plus at most one other
-                // player left (upstream: 3 or 2 alive for a single pair).
                 if (alive.Count <= Partners.Count + 1)
                 {
                     DeclareEnd(WinKind.Lovers);
@@ -326,8 +299,6 @@ namespace TownOfRoles.Roles.Lovers
                 }
             }
 
-            // Upstream's NobodyWins: the last two players standing are both
-            // Neutral roles, so neither team can win.
             if (alive.Count == 2 && !IsLover(alive[0]) && !IsLover(alive[1]) &&
                 IsNeutralCustomRole(alive[0]) && IsNeutralCustomRole(alive[1]))
             {
@@ -359,9 +330,6 @@ namespace TownOfRoles.Roles.Lovers
                 : "Lovers: the love couple wins.");
         }
 
-        // Claims the end screen's title for the round, locally on whichever side the win lands
-        // (host from DeclareEnd, clients from the EndRpc). The screen itself is drawn by
-        // MarshAPI's central ModdedGameOver patches.
         private static void ClaimEnd(WinKind kind)
         {
             if (kind == WinKind.Nobody)
@@ -372,7 +340,7 @@ namespace TownOfRoles.Roles.Lovers
             ModdedGameOver.Claim("Love Couple Wins", LoverRole.LoverColor);
         }
 
-        [ReactorRpc(EndRpc)]
+        [AtomicRpc(EndRpc)]
         private static void OnEndRpc(byte senderId, string kind)
         {
             var client = AmongUsClient.Instance;
@@ -380,7 +348,6 @@ namespace TownOfRoles.Roles.Lovers
             ClaimEnd(string.Equals(kind, "nobody", StringComparison.Ordinal) ? WinKind.Nobody : WinKind.Lovers);
         }
 
-        // Helpers
         private static List<PlayerControl> AlivePlayers()
         {
             var alive = new List<PlayerControl>();
@@ -393,7 +360,6 @@ namespace TownOfRoles.Roles.Lovers
             return alive;
         }
 
-        // True when the player's custom role (per the catalog) is Neutral.
         private static bool IsNeutralCustomRole(PlayerControl player)
         {
             var roleId = RoleRegistry.GetAssignedRoleTypeName(player);
@@ -429,13 +395,6 @@ namespace TownOfRoles.Roles.Lovers
             BepInEx.Logging.Logger.CreateLogSource("TownOfRoles").LogInfo(message);
     }
 
-    // (The old EndGameManager Update/SetEverythingUp Lovers patches are gone, 
-    // MarshAPI's central ModdedGameOver pair draws the end screen for every role;
-    // the Lovers claim their two titles in ClaimEnd.)
-
-    // Host-authoritative end criteria. Priority.Last so the mod's other prefixes on the same
-    // method (commands' NoGameEnd, custom game modes) run first and can still veto the vanilla
-    // check themselves.
     [HarmonyPatch(typeof(ShipStatus), nameof(ShipStatus.CheckEndCriteria))]
     [HarmonyPriority(Priority.Last)]
     internal static class ShipStatus_CheckEndCriteria_LoversPatch

@@ -1,5 +1,5 @@
 using System.Collections.Generic;
-using ClassicUs.Reactor;
+using Atomic;
 using MarshAPI;
 using HarmonyLib;
 using Il2CppInterop.Runtime.InteropTypes.Arrays;
@@ -7,20 +7,17 @@ using TownOfRoles.Core;
 
 namespace TownOfRoles.Roles.Swapper
 {
-    // Swapper gameplay logic (ported from Town-Of-Us' Swapper.cs).
     internal static class SwapperSystem
     {
         private const string SwapRpc = "townofroles.SwapperSwap";
         private const string RequestSwapRpc = "townofroles.SwapperRequestSwap";
         private const byte None = 255;
 
-        // swapperId -> (first selected playerId, second selected playerId).
         private static readonly Dictionary<byte, (byte A, byte B)> Selections = new();
 
         public static bool IsSwapper(PlayerControl player) =>
             player != null && player.Data != null && RoleRegistry.IsAssigned(player, SwapperRole.Id);
 
-        // Called by the meeting UI when the local Swapper's pair changes.
         public static void UpdateSelection(byte swapperId, byte a, byte b)
         {
             var client = AmongUsClient.Instance;
@@ -45,7 +42,7 @@ namespace TownOfRoles.Roles.Swapper
         public static void OnMeetingStarted(MeetingEventArgs _) => Reset();
         public static void OnMeetingEnded(MeetingEventArgs _) => Reset();
 
-        [ReactorRpc(RequestSwapRpc)]
+        [AtomicRpc(RequestSwapRpc)]
         private static void OnRequestSwap(byte senderId, byte swapperId, byte a, byte b)
         {
             var client = AmongUsClient.Instance;
@@ -62,7 +59,7 @@ namespace TownOfRoles.Roles.Swapper
             }
         }
 
-        [ReactorRpc(SwapRpc)]
+        [AtomicRpc(SwapRpc)]
         private static void OnSwap(byte senderId, byte swapperId, byte a, byte b)
         {
             var client = AmongUsClient.Instance;
@@ -70,8 +67,6 @@ namespace TownOfRoles.Roles.Swapper
             SetSelection(swapperId, a, b);
         }
 
-        // Host-only tally swap (CalculateVotes is private; string form survives
-        // interop drift, same rationale as the Mayor patch).
         [HarmonyPatch(typeof(MeetingHud), "CalculateVotes")]
         internal static class MeetingHud_CalculateVotes_SwapperPatch
         {
@@ -81,7 +76,7 @@ namespace TownOfRoles.Roles.Swapper
                 {
                     var client = AmongUsClient.Instance;
                     if (client == null || !client.AmHost) return;
-                    // playerStates is private in the 2026.8.9 interop.
+
                     if (__instance == null || GameReflection.GetPlayerStates(__instance) == null || __result == null) return;
                     if (Selections.Count == 0) return;
 

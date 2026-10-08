@@ -4,8 +4,6 @@ using TownOfRoles.Core;
 
 namespace TownOfRoles.Roles.TimeLord
 {
-    // Time Lord, a Crewmate who can rewind everyone back to where they stood. Ported from the
-    // original Town-Of-Us TimeLord role.
     internal sealed class TimeLordRole : CustomCrewmateRole
     {
         public const string Id = "townofroles.TimeLord";

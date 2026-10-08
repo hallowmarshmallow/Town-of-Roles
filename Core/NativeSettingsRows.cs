@@ -8,17 +8,15 @@ using UnityEngine;
 
 namespace TownOfRoles.Core
 {
-    // The mod's role settings, as native rows appended below the game's own options in its
-    // config window, one list, no separate page.
     internal static class NativeSettingsRows
     {
         private const string RowPrefix = "ToR_Row_";
 
         private readonly struct RoleRow
         {
-            public readonly string Key;      // RoleSettingsSync channel prefix, e.g. "Sheriff"
-            public readonly string Display;  // Label shown in the menu
-            public readonly Color Color;     // Label tint (the role's own colour)
+            public readonly string Key;
+            public readonly string Display;
+            public readonly Color Color;
 
             public RoleRow(string key, string display, Color color)
             {
@@ -30,8 +28,6 @@ namespace TownOfRoles.Core
 
         private static SettingMenu _menu;
 
-        // Called from a SettingMenu.OnEnable postfix after the game has built its own option
-        // rows. Inert unless RoleConfig.NativeMenuRows is on.
         public static void Inject(SettingMenu menu)
         {
             if (RoleConfig.NativeMenuRows?.Value != true) return;
@@ -41,9 +37,6 @@ namespace TownOfRoles.Core
             {
                 var parent = menu.menu.transform;
 
-                // The game rebuilds its rows on every OnEnable, but be defensive:
-                // always start from a clean slate so the list can never stack two
-                // copies of itself. DestroyRows also releases the click ids.
                 SettingRows.DestroyRows(parent, RowPrefix);
                 _menu = menu;
 
@@ -61,8 +54,6 @@ namespace TownOfRoles.Core
                     BuildCountRow(parent, role, y);
                     added++;
 
-                    // A role's own config only exists while its count is >= 1:
-                    // at 0 the row is collapsed, and crossing to 1 expands it.
                     if (RoleSettingsSync.GetInt(role.Key + ".Count") < 1) continue;
                     if (!RoleOptionSpecs.TryGet(role.Key, out var extras)) continue;
 
@@ -75,10 +66,6 @@ namespace TownOfRoles.Core
                     }
                 }
 
-                // Appending rows grows the list past the range the game sized its
-                // own Scroller for, which is what leaves extra rows unreachable.
-                // UiScroll claims the extra range and MarshAPI re-applies that claim
-                // every frame, so this only has to say how many rows there are now.
                 UiScroll.EnsureRowsReachable(parent, added, step);
             }
             catch (Exception e)
@@ -87,8 +74,6 @@ namespace TownOfRoles.Core
             }
         }
 
-        // One row per enabled role, in RoleCatalog order (Crewmate, then Impostor, then
-        // Neutral), tinted with the role's own colour.
         private static List<RoleRow> BuildRows()
         {
             var rows = new List<RoleRow>();
@@ -103,19 +88,15 @@ namespace TownOfRoles.Core
             return rows;
         }
 
-        // Count stepper: clamps 0..15, then re-lays the list so the role's config rows expand
-        // (count reaches 1) or collapse (count drops to 0).
         private static void StepCount(string key, int delta)
         {
             if (!RoleSettingsSync.CanEdit) return;
             int current = RoleSettingsSync.GetInt(key + ".Count");
             int next = Mathf.Clamp(current + delta, 0, 15);
             RoleSettingsSync.SetInt(key + ".Count", next);
-            Inject(_menu); // re-lays out; every value is re-read from its channel
+            Inject(_menu);
         }
 
-        // A role's Count row: the role's own label and colour, stepping its per-match role
-        // count.
         private static void BuildCountRow(Transform parent, RoleRow role, float y)
         {
             var name = RowPrefix + "Count_" + role.Key;
@@ -132,16 +113,10 @@ namespace TownOfRoles.Core
             });
         }
 
-        // A per-role config row: same native row prefab, label dimmed (it is a sub-setting
-        // under the role), value formatted per kind, steppers routed through UiRuntime.
         private static void BuildConfigRow(Transform parent, string channel, string labelText, string kind, float y)
         {
             var name = RowPrefix + "Cfg_" + channel.Replace(".", "_");
 
-            // The stepper refreshes the row's value text in place (the row keeps
-            // its position, so re-laying the whole list on every click would be
-            // needless churn). `row` is assigned by AddRow below, before any click
-            // can arrive.
             GameObject row = null;
             row = SettingRows.AddRow(_menu, new SettingRowRequest
             {
@@ -186,7 +161,7 @@ namespace TownOfRoles.Core
                 case "float":
                     RoleSettingsSync.SetFloat(channel, Mathf.Max(0f, RoleSettingsSync.GetFloat(channel) + delta));
                     break;
-                default: // string: cycle the two options (Faction/Role, Jester/Crewmate)
+                default:
                     var current = RoleSettingsSync.GetString(channel, "Faction");
                     RoleSettingsSync.SetString(channel, current == "Faction" ? "Role"
                         : current == "Role" ? "Faction"
@@ -194,14 +169,9 @@ namespace TownOfRoles.Core
                     break;
             }
 
-            // The row keeps its place, so its text can be refreshed in situ.
             if (row != null && SettingRows.TryGetRowTexts(row, out _, out var valueText) && valueText != null)
                 valueText.text = FormatValue(channel, kind);
 
-            // A change made here has to reach whatever surface is in charge of this
-            // setting. When the game's own role-option page is enabled it owns the
-            // host-authoritative store, so mirror the value into it; otherwise this
-            // is a no-op and the channel above is the only store, as before.
             RoleNativeOptions.PushChannel(channel);
         }
 
@@ -209,8 +179,6 @@ namespace TownOfRoles.Core
             BepInEx.Logging.Logger.CreateLogSource("TownOfRoles").LogError("Native settings rows: " + message);
     }
 
-    // Fires when the settings window builds its own rows, which is the only point at which the
-    // native list exists to append to.
     [HarmonyPatch(typeof(SettingMenu), nameof(SettingMenu.OnEnable))]
     internal static class SettingMenu_OnEnable_NativeSettingsRowsPatch
     {

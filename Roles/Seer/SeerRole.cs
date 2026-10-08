@@ -14,7 +14,7 @@ namespace TownOfRoles.Roles.Seer
         public override int Count => RoleConfig.Count(RoleConfig.SeerCount);
         public override float RoleChancePercent => RoleConfig.Chance(RoleConfig.SeerChance);
         public override string DescriptionShort => "Investigate players.";
-        // Seer uses a dedicated MarshAPI ability button, not the native Kill button.
+
         public override string KillAbilityName => string.Empty;
         public override Color TeamColor => new(0.65f, 0.45f, 1f, 1f);
     }

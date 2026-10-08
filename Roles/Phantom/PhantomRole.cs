@@ -4,8 +4,6 @@ using TownOfRoles.Core;
 
 namespace TownOfRoles.Roles.Phantom
 {
-    // Phantom, a Neutral who, on death, becomes a fading phantom and must complete all
-    // remaining tasks to win. Ported from the original Town-Of-Us Phantom role.
     internal sealed class PhantomRole : CustomRole
     {
         public const string Id = "townofroles.Phantom";

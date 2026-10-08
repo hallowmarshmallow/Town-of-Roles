@@ -2,14 +2,12 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using BepInEx.Configuration;
-using ClassicUs.Reactor;
+using Atomic;
 using MarshAPI;
 using InnerNet;
 
 namespace TownOfRoles.Core
 {
-    // Single source of truth for Town Of Roles role settings that are editable from the in-game
-    // config overlay.
     internal static class RoleSettingsSync
     {
         private const string RpcKey = "townofroles.RoleSettings";
@@ -22,18 +20,12 @@ namespace TownOfRoles.Core
             public Kind Kind;
             public Func<object> Get;
 
-            // Writes the value and rebroadcasts (the editor path).
             public Action<object> Set;
 
-            // Writes the value only. Separate from Set because a value that arrived from
-            // somewhere else, the host's RPC payload, or the game's own role-option store, is
-            // not a local edit and must not echo back out as one.
             public Action<object> Apply;
 
             public Func<string, object> Parse;
 
-            // The bounds this channel already clamps to, recorded so they can be *reported*
-            // rather than only enforced inside the clamp lambda.
             public bool HasBounds;
             public float Min;
             public float Max;
@@ -43,7 +35,6 @@ namespace TownOfRoles.Core
 
         public static bool Initialized { get; private set; }
 
-        // True when the local player can edit (no client = freeplay).
         public static bool CanEdit => AmongUsClient.Instance == null || AmongUsClient.Instance.AmHost;
 
         public static void Init()
@@ -51,7 +42,6 @@ namespace TownOfRoles.Core
             if (Initialized) return;
             Channels.Clear();
 
-            // Crewmate roles
             AddBool("Sheriff.Enabled", RoleConfig.Sheriff);
             AddInt("Sheriff.Count", RoleConfig.SheriffCount, 0, 15);
             AddFloat("Sheriff.Chance", RoleConfig.SheriffChance, 0f, 100f);
@@ -103,7 +93,6 @@ namespace TownOfRoles.Core
             AddInt("Spy.Count", RoleConfig.SpyCount, 0, 15);
             AddFloat("Spy.Chance", RoleConfig.SpyChance, 0f, 100f);
 
-            // Impostor roles
             AddBool("Assassin.Enabled", RoleConfig.Assassin);
             AddInt("Assassin.Count", RoleConfig.AssassinCount, 0, 15);
             AddFloat("Assassin.Chance", RoleConfig.AssassinChance, 0f, 100f);
@@ -143,7 +132,6 @@ namespace TownOfRoles.Core
             AddFloat("Undertaker.Chance", RoleConfig.UndertakerChance, 0f, 100f);
             AddFloat("Undertaker.DragCooldown", RoleConfig.UndertakerDragCooldown, 0f, 600f);
 
-            // Batch 4 roles (crewmate investigators + neutral phantom)
             AddBool("Investigator.Enabled", RoleConfig.Investigator);
             AddInt("Investigator.Count", RoleConfig.InvestigatorCount, 0, 15);
             AddFloat("Investigator.Chance", RoleConfig.InvestigatorChance, 0f, 100f);
@@ -169,7 +157,6 @@ namespace TownOfRoles.Core
             AddFloat("Miner.Chance", RoleConfig.MinerChance, 0f, 100f);
             AddFloat("Miner.MineCooldown", RoleConfig.MineCooldown, 0f, 600f);
 
-            // Batch 5 roles (final OG set: Shifter + The Glitch)
             AddBool("Shifter.Enabled", RoleConfig.Shifter);
             AddInt("Shifter.Count", RoleConfig.ShifterCount, 0, 15);
             AddFloat("Shifter.Chance", RoleConfig.ShifterChance, 0f, 100f);
@@ -184,7 +171,6 @@ namespace TownOfRoles.Core
             AddFloat("Glitch.HackDuration", RoleConfig.GlitchHackDuration, 1f, 60f);
             AddFloat("Glitch.KillCooldown", RoleConfig.GlitchKillCooldown, 0f, 600f);
 
-            // Neutral roles
             AddBool("Jester.Enabled", RoleConfig.Jester);
             AddInt("Jester.Count", RoleConfig.JesterCount, 0, 15);
             AddFloat("Jester.Chance", RoleConfig.JesterChance, 0f, 100f);
@@ -206,7 +192,6 @@ namespace TownOfRoles.Core
             AddBool("Lovers.BothDie", RoleConfig.LoversBothDie);
             AddBool("Lovers.ImpostorLover", RoleConfig.LoversImpostorLover);
 
-            // Modifiers
             AddBool("Modifiers.Torch.Enabled", RoleConfig.ModifierTorch);
             AddFloat("Modifiers.Torch.Probability", RoleConfig.ModifierTorchProbability, 0f, 100f);
             AddBool("Modifiers.Diseased.Enabled", RoleConfig.ModifierDiseased);
@@ -225,22 +210,16 @@ namespace TownOfRoles.Core
             Initialized = true;
         }
 
-        // Typed getters (UI reads through these)
         public static bool GetBool(string name, bool def = false) => Find(name)?.Get() is bool b ? b : def;
         public static int GetInt(string name, int def = 0) => Find(name)?.Get() is int i ? i : def;
         public static float GetFloat(string name, float def = 0f) => Find(name)?.Get() is float f ? f : def;
         public static string GetString(string name, string def = "") => Find(name)?.Get() is string s ? s : def;
 
-        // Typed setters (UI writes through these)
         public static void SetBool(string name, bool value) => Set(name, value);
         public static void SetInt(string name, int value) => Set(name, value);
         public static void SetFloat(string name, float value) => Set(name, value);
         public static void SetString(string name, string value) => Set(name, value);
 
-        // Native role option support
-
-        // Describes an existing channel in the terms the game's own RoleOption row needs: its
-        // kind, its bounds, and its current value.
         public static bool TryDescribe(string channelName, out string kind, out float min, out float max, out float current)
         {
             kind = null;
@@ -278,7 +257,6 @@ namespace TownOfRoles.Core
             return true;
         }
 
-        // Writes a value that came from the game's own role-option store.
         internal static bool ApplyFromNative(string channelName, float value)
         {
             var channel = Find(channelName);
@@ -310,13 +288,10 @@ namespace TownOfRoles.Core
             catch (Exception e) { Log("set " + name + ": " + e.Message); }
         }
 
-        // Rebroadcast the full value set to all clients (host only).
         public static void HostBroadcast()
         {
             if (!CanEdit) return;
-            // Only meaningful in a real networked lobby. In Freeplay the Reactor
-            // handshake never finalizes, so SendRpcMethod spams the log with
-            // "'townofroles.RoleSettings' was never reserved" on every join.
+
             var client = AmongUsClient.Instance;
             if (client == null || !client.AmHost || client.GameState == InnerNetClient.GameStates.NotJoined) return;
             var payload = BuildPayload();
@@ -325,7 +300,7 @@ namespace TownOfRoles.Core
             catch (Exception e) { Log("broadcast: " + e.Message); }
         }
 
-        [ReactorRpc(RpcKey)]
+        [AtomicRpc(RpcKey)]
         private static void Receive(byte senderId, string payload)
         {
             var client = AmongUsClient.Instance;
@@ -339,18 +314,15 @@ namespace TownOfRoles.Core
                 if (eq <= 0) continue;
                 var ch = Find(pair.Substring(0, eq));
                 if (ch == null) continue;
-                // Apply, not Set: a received value is not a local edit. (Set would
-                // additionally rebroadcast, which on a client cannot happen anyway,
-                // but the distinction is what keeps the two paths honest.)
+
                 try { ch.Apply(ch.Parse(pair.Substring(eq + 1))); }
-                catch { /* malformed value: keep this client's current value */ }
+                catch {   }
             }
         }
 
         public static void OnGameStarted(GameStartedEventArgs _) => HostBroadcast();
         public static void OnPlayerJoined(PlayerConnectionEventArgs _) => HostBroadcast();
 
-        // Channel plumbing
         private static Channel Find(string name)
         {
             for (int i = 0; i < Channels.Count; i++)
@@ -425,10 +397,6 @@ namespace TownOfRoles.Core
                 Max = max,
             };
 
-            // Assigned after construction and against this channel specifically: an
-            // initializer lambda that ran later could not name the object it belongs
-            // to, and "the last channel in the list" is a different channel as soon
-            // as the next Add runs.
             channel.Set = value =>
             {
                 channel.Apply(value);

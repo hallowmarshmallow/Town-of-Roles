@@ -4,8 +4,6 @@ using TownOfRoles.Core;
 
 namespace TownOfRoles.Roles.Shifter
 {
-    // Shifter, a Neutral with no win condition who swaps roles and tasks with other players.
-    // Ported from the original Town-Of-Us Shifter role.
     internal sealed class ShifterRole : CustomRole
     {
         public const string Id = "townofroles.Shifter";

@@ -3,9 +3,6 @@ using UnityEngine;
 
 namespace TownOfRoles.Core
 {
-    // Single source of truth for every custom role's presentation metadata: the under-name
-    // display name, its color, the flavor description, and the task-stats text shown on the
-    // tasks tab ("Your Role: X, ...").
     internal readonly struct RoleDef
     {
         public readonly string Id;
@@ -30,7 +27,6 @@ namespace TownOfRoles.Core
     {
         public static readonly RoleDef[] All =
         {
-            // Crewmate
             new("townofroles.Sheriff",      "Sheriff",      RoleTeamTypes.Crewmate,
                 new Color(0.95f, 0.8f, 0.2f, 1f),   "Shoot the impostors",
                 "Shoot Impostors. Shooting a non-enemy may kill you."),
@@ -68,7 +64,6 @@ namespace TownOfRoles.Core
                 new Color(0.95f, 0.85f, 0.35f, 1f),  "Find the Impostors once your tasks are done.",
                 "Complete all your tasks to reveal the Impostors with arrows."),
 
-            // Impostor
             new("townofroles.Assassin",     "Assassin",     RoleTeamTypes.Impostor,
                 new Color(0.95f, 0.15f, 0.18f, 1f),  "During meetings, guess another player's role. A correct guess kills them; a wrong guess kills you.",
                 "Guess another player's role during a meeting. Wrong guesses kill you."),
@@ -94,7 +89,6 @@ namespace TownOfRoles.Core
                 new Color(0.85f, 0.5f, 0.2f, 1f),    "Mine vents that connect only to each other.",
                 "Mine vents that connect only to each other to move around the map."),
 
-            // Neutral
             new("townofroles.Jester",       "Jester",       RoleTeamTypes.Neutral,
                 new Color(0.86f, 0.35f, 0.95f, 1f),  "Get yourself voted out to win.",
                 "Get yourself voted out to win."),
@@ -113,16 +107,12 @@ namespace TownOfRoles.Core
             new("townofroles.Glitch",       "The Glitch",   RoleTeamTypes.Neutral,
                 new Color(0.45f, 0.95f, 0.35f, 1f),  "Mimic, hack, and kill everyone to be the last one standing.",
                 "Mimic players, hack them, and kill everyone to be the last one standing."),
-            // Lovers last on purpose: this table decides the under-name label, and
-            // the overlay must only be shown for a player who has no role of their
-            // own (TryGet returns the first match).
+
             new("townofroles.Lovers",       "Lover",        RoleTeamTypes.Neutral,
                 new Color(1f, 0.4f, 0.8f, 1f),       "You are in love. Keep each other alive and win together.",
                 "Protect your lover \u2014 you win or die together."),
         };
 
-        // The settings/RPC key for a role: the catalog id without its "townofroles." prefix
-        // (townofroles.TimeLord → TimeLord).
         public static string KeyOf(in RoleDef def)
         {
             const string prefix = "townofroles.";
@@ -132,8 +122,6 @@ namespace TownOfRoles.Core
                 : def.Id;
         }
 
-        // The settings key for a role *id* (townofroles.TimeLord → TimeLord), or null when the
-        // id is not in the catalog.
         public static string KeyOfId(string id)
         {
             if (id == null) return null;

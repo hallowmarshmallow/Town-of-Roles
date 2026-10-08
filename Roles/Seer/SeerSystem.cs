@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using ClassicUs.Reactor;
+using Atomic;
 using MarshAPI;
 using UnityEngine;
 using TownOfRoles.Core;
@@ -13,8 +13,7 @@ namespace TownOfRoles.Roles.Seer
         private const string RequestInvestigateRpc = "townofroles.SeerRequestInvestigate";
         private static readonly Dictionary<byte, int> UsesRemaining = new();
         private static readonly Dictionary<byte, DateTime> Cooldowns = new();
-        // (seerId, targetId) -> (result text, result color). Drawn under the
-        // target's name by the role presentation system instead of a popup.
+
         private static readonly Dictionary<(byte seerId, byte targetId), (string text, Color color)> Reveals = new();
 
         public static bool IsSeer(PlayerControl player) =>
@@ -44,9 +43,6 @@ namespace TownOfRoles.Roles.Seer
             IsSeer(seer) && !seer.Data.IsDead && GetUses(seer.PlayerId) > 0 &&
             DateTime.UtcNow >= GetCooldown(seer.PlayerId);
 
-        // Investigations left for a player, for the HUD counter. The same value
-        // CanInvestigateNow gates on, so the counter cannot disagree with whether the button
-        // works.
         internal static int RemainingUses(PlayerControl seer) =>
             seer == null || seer.Data == null ? 0 : GetUses(seer.PlayerId);
 
@@ -63,9 +59,6 @@ namespace TownOfRoles.Roles.Seer
         private static DateTime GetCooldown(byte id) =>
             Cooldowns.TryGetValue(id, out var value) ? value : DateTime.MinValue;
 
-        // Resolves what a Seer learns about a target: either the target's faction (Impostor /
-        // Neutral / Crewmate) or their role name, together with a color for the under-name
-        // reveal.
         private static (string text, Color color) ResolveResult(PlayerControl target)
         {
             if (target?.Data?.myRole == null) return ("Unknown", new Color(0.6f, 0.6f, 0.6f, 1f));
@@ -84,9 +77,6 @@ namespace TownOfRoles.Roles.Seer
             }
         }
 
-        // Returns the investigation result the given viewer has for a target, if any. The
-        // presentation system uses this to draw the result under the target's name instead of
-        // showing a chat/popup message.
         public static bool TryGetReveal(PlayerControl viewer, PlayerControl target, out string text, out Color color)
         {
             text = null;
@@ -108,7 +98,7 @@ namespace TownOfRoles.Roles.Seer
         public static void OnGameStarted(GameStartedEventArgs _) => Reset();
         public static void OnGameEnded(GameEndedEventArgs _) => Reset();
 
-        [ReactorRpc(RequestInvestigateRpc)]
+        [AtomicRpc(RequestInvestigateRpc)]
         private static void OnRequestInvestigateRpc(byte senderId, byte playerId)
         {
             var client = AmongUsClient.Instance;
@@ -125,7 +115,7 @@ namespace TownOfRoles.Roles.Seer
             }
         }
 
-        [ReactorRpc(InvestigateRpc)]
+        [AtomicRpc(InvestigateRpc)]
         private static void OnInvestigateRpc(byte senderId, byte seerPlayerId, byte targetPlayerId, string result, int usesRemaining)
         {
             var client = AmongUsClient.Instance;
@@ -138,9 +128,7 @@ namespace TownOfRoles.Roles.Seer
                 foreach (var player in PlayerControl.AllPlayerControls)
                 {
                     if (player == null || player.PlayerId != targetPlayerId) continue;
-                    // Re-resolve locally so the color matches this client's role
-                    // presentation (the host only sent the text). Fall back to the
-                    // host's text if local resolution differs.
+
                     var reveal = ResolveResult(player);
                     Reveals[(seerPlayerId, targetPlayerId)] = (result ?? reveal.text, reveal.color);
                     break;

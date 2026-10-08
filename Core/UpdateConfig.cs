@@ -2,8 +2,6 @@ using BepInEx.Configuration;
 
 namespace TownOfRoles.Core
 {
-    // Self-update settings. The mod checks a hosted latest.json manifest on launch, compares
-    // versions, and shows an in-game modal when a newer Town Of Roles build is available.
     internal static class UpdateConfig
     {
         public static ConfigEntry<bool> Enabled { get; private set; }
@@ -18,7 +16,7 @@ namespace TownOfRoles.Core
 
             ManifestUrl = config.Bind(
                 "Updates", "ManifestUrl",
-                "https://github.com/hallowmarshmallow/townofroles/releases/latest/download/latest.json",
+                "https://github.com/hallowmarshmallow/Town-of-Roles/releases/latest/download/latest.json",
                 "URL of the latest.json update manifest. With GitHub Releases, use the stable 'releases/latest/download/latest.json' URL so it always points at the newest release.");
 
             AllowDownload = config.Bind(

@@ -7,12 +7,10 @@ using TownOfRoles.Core;
 
 namespace TownOfRoles.Roles.Snitch
 {
-    // Snitch gameplay logic (ported from Town-Of-Us' Snitch.cs).
     internal static class SnitchSystem
     {
         private static readonly Dictionary<byte, ArrowBehaviour> Arrows = new();
-        // Impostors whose overhead name we tinted red (Town-Of-Us
-        // SnitchMod.HighlightImpostors does arrows + red names; restore on clear).
+
         private static readonly HashSet<byte> NameHighlighted = new();
 
         public static bool IsSnitch(PlayerControl player) =>
@@ -21,16 +19,14 @@ namespace TownOfRoles.Roles.Snitch
         public static bool TasksComplete(PlayerControl player)
         {
             if (player == null || player.Data == null || player.Data.Tasks == null) return false;
-            // All assigned tasks complete (per-player; GameData.TotalTasks is the
-            // lobby-wide aggregate, not this player's workload).
+
             var tasks = player.Data.Tasks;
             if (tasks.Count == 0) return false;
             for (int i = 0; i < tasks.Count; i++)
-                if (tasks.get_Item(i) == null || !tasks.get_Item(i).Complete) return false;
+                if (tasks[i] == null || !tasks[i].Complete) return false;
             return true;
         }
 
-        // Runs every frame on every client; only the Snitch with tasks done sees arrows.
         public static void Tick()
         {
             var local = PlayerControl.LocalPlayer;
@@ -44,7 +40,6 @@ namespace TownOfRoles.Roles.Snitch
 
         private static void UpdateArrows(PlayerControl snitch)
         {
-            // Live Impostor targets.
             var targets = new HashSet<byte>();
             foreach (var player in PlayerControl.AllPlayerControls)
             {
@@ -54,15 +49,13 @@ namespace TownOfRoles.Roles.Snitch
                 if (Arrows.TryGetValue(player.PlayerId, out var arrow) && arrow != null)
                 {
                     arrow.target = player.transform.position;
-                    // Re-derived rather than set once: the size is a share of the
-                    // camera, and the camera's own size can change under the arrow.
+
                     if (arrow.image != null) SizeArrow(arrow.transform, arrow.image.sprite);
                     continue;
                 }
                 CreateArrow(player);
             }
 
-            // Remove arrows for Impostors that are no longer targets.
             if (Arrows.Count > 0)
             {
                 var stale = new List<byte>();
@@ -71,9 +64,6 @@ namespace TownOfRoles.Roles.Snitch
                 for (int i = 0; i < stale.Count; i++) DestroyArrow(stale[i]);
             }
 
-            // Red nameplates over every living Impostor (local-only visual).
-            // Suppressed while a Camouflager camouflage is live, colored plates
-            // would defeat the whole point of hiding identities.
             foreach (var player in PlayerControl.AllPlayerControls)
             {
                 if (player == null || player.Data == null || player.Data.IsDead || player.Data.Disconnected) continue;
@@ -88,8 +78,6 @@ namespace TownOfRoles.Roles.Snitch
             }
         }
 
-        // The arrow's drawn height as a share of the screen, so it reads the same at every
-        // resolution and aspect ratio.
         private const float ScreenHeightShare = 0.05f;
 
         private static void CreateArrow(PlayerControl player)
@@ -97,15 +85,11 @@ namespace TownOfRoles.Roles.Snitch
             try
             {
                 var icon = RoleArt.Arrow;
-                if (icon == null) return; // check before allocating the GameObject
+                if (icon == null) return;
 
                 var go = new GameObject("ToU_SnitchArrow_" + player.PlayerId);
                 var arrow = go.AddComponent<ArrowBehaviour>();
 
-                // The sprite goes on a child, not on the arrow object:
-                // ArrowBehaviour.LateUpdate rewrites the arrow's localScale every frame from the
-                // distance to its target, which is what made the arrow huge across the map. A
-                // child keeps its own scale and still inherits the distance shrink.
                 var sprite = new GameObject("Sprite");
                 sprite.transform.SetParent(go.transform, false);
                 var sr = sprite.AddComponent<SpriteRenderer>();
@@ -120,7 +104,6 @@ namespace TownOfRoles.Roles.Snitch
             catch { }
         }
 
-        // Sizes an arrow's sprite child from the camera.
         private static void SizeArrow(Transform root, Sprite icon)
         {
             if (root == null || icon == null || root.childCount == 0) return;

@@ -8,8 +8,6 @@ using TownOfRoles.Core;
 
 namespace TownOfRoles.Roles.Swapper
 {
-    // Meeting UI for the Swapper: one toggle button beside each player row. Clicking fills the
-    // pair (first click = A, second = B, third on an already-selected row clears it).
     internal static class SwapperMeetingUi
     {
         private const byte None = 255;
@@ -32,7 +30,7 @@ namespace TownOfRoles.Roles.Swapper
             Clear();
             _first = None;
             _second = None;
-            // playerStates is private in the 2026.8.9 interop, reflection adapter.
+
             var states = GameReflection.GetPlayerStates(meeting);
             if (states == null) return;
 
@@ -67,8 +65,6 @@ namespace TownOfRoles.Roles.Swapper
                 var template = area.Buttons.transform.GetChild(0).gameObject;
                 if (template == null) return;
 
-                // Preserve mode: a native vote button, kept whole (see
-                // AssassinMeetingUi for why OnClick is left in place).
                 var button = UiClone.Clone(template, area.transform, new UiCloneOptions
                 {
                     Name = "TownOfRoles_SwapperSwap_" + targetId,
@@ -80,7 +76,6 @@ namespace TownOfRoles.Roles.Swapper
                 ConfigureButton(button);
                 SetClick(button, targetId);
 
-                // A / B label overlay (clone of the row's name text).
                 Component label = null;
                 if (area.NameText != null)
                 {

@@ -23,7 +23,7 @@ namespace TownOfRoles.Core
             AllowSetRole = config.Bind(
                 "Commands", "AllowSetRole", true,
                 "Allow the host to use /setrole and the Freeplay role selector for enabled custom roles.");
-                
+
             CustomCommandHostOnly = config.Bind(
                 "Commands", "CustomCommandHostOnly", false,
                 "Restrict slash commands to host only.");

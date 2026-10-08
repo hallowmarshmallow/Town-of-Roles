@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using ClassicUs.Reactor;
+using Atomic;
 using MarshAPI;
 using HarmonyLib;
 using UnityEngine;
@@ -8,7 +8,6 @@ using TownOfRoles.Core;
 
 namespace TownOfRoles.Roles.Shifter
 {
-    // Shifter gameplay logic (ported from Town-Of-Us' Shifter.cs).
     internal static class ShifterSystem
     {
         private const string SwapRpc = "townofroles.ShifterSwap";
@@ -16,10 +15,7 @@ namespace TownOfRoles.Roles.Shifter
         private const string SuicideRpc = "townofroles.ShifterSuicide";
 
         private static readonly Dictionary<byte, DateTime> Cooldowns = new();
-        // Players who shifted away and are no longer the Shifter (mirrors the Executioner's
-        // Converted set: AssignRole(..., "Crewmate") leaves the virtual registry entry
-        // lingering, so presentation/abilities must gate on this set instead of the raw
-        // registry).
+
         private static readonly HashSet<byte> SwappedAway = new();
 
         public static bool IsShifter(PlayerControl player) =>
@@ -48,7 +44,6 @@ namespace TownOfRoles.Roles.Shifter
 
             Cooldowns[shifter.PlayerId] = DateTime.UtcNow.AddSeconds(RoleConfig.Seconds(RoleConfig.ShiftCooldown, 30f));
 
-            // Shifting an Impostor fails and kills the Shifter (Town-Of-Us ShiftKill).
             if (target.Data.myRole != null && target.Data.myRole.RoleTeamType == RoleTeamTypes.Impostor)
             {
                 KillManager.Kill(shifter, shifter);
@@ -60,8 +55,6 @@ namespace TownOfRoles.Roles.Shifter
             var targetRoleId = FindAssignedRoleId(target);
             var shifterRoleId = FindAssignedRoleId(shifter) ?? string.Empty;
 
-            // Task swap first: both players exchange their task type ids through
-            // the game's own broadcast RPC (host only).
             var shifterTasks = GetTaskTypeIds(shifter);
             var targetTasks = GetTaskTypeIds(target);
             try
@@ -77,15 +70,10 @@ namespace TownOfRoles.Roles.Shifter
                 BepInEx.Logging.Logger.CreateLogSource("TownOfRoles").LogError("Shifter tasks: " + e.Message);
             }
 
-            // The Shifter is no longer the Shifter after a successful swap. Gate
-            // IsShifter on SwappedAway because AssignRole leaves the virtual
-            // registry entry lingering (same pattern as Executioner.Converted).
             SwappedAway.Add(shifter.PlayerId);
 
             if (targetRoleId == null)
             {
-                // Plain Crewmate: the target becomes the Shifter, the Shifter
-                // becomes a baseline Crewmate (roles exchanged).
                 if (RoleManager.Instance != null)
                 {
                     RoleManager.Instance.AssignRole(target, ShifterRole.Id);
@@ -94,8 +82,6 @@ namespace TownOfRoles.Roles.Shifter
             }
             else
             {
-                // Custom role held by the target: the Shifter takes it, the
-                // target is reduced to a baseline Crewmate.
                 if (RoleManager.Instance != null)
                 {
                     RoleManager.Instance.AssignRole(shifter, targetRoleId);
@@ -106,7 +92,6 @@ namespace TownOfRoles.Roles.Shifter
             TownOfRolesRpcMux.Send(SwapRpc, shifter.PlayerId, target.PlayerId, targetRoleId ?? string.Empty);
         }
 
-        // Round lifecycle / pool
         public static void OnGameStarted(GameStartedEventArgs _) => Reset();
 
         public static void Reset()
@@ -117,8 +102,7 @@ namespace TownOfRoles.Roles.Shifter
 
         public static void OnGameEnded(GameEndedEventArgs _) { }
 
-        // RPCs
-        [ReactorRpc(RequestShiftRpc)]
+        [AtomicRpc(RequestShiftRpc)]
         private static void OnRequestShift(byte senderId, byte playerId)
         {
             var client = AmongUsClient.Instance;
@@ -135,7 +119,7 @@ namespace TownOfRoles.Roles.Shifter
             }
         }
 
-        [ReactorRpc(SwapRpc)]
+        [AtomicRpc(SwapRpc)]
         private static void OnSwap(byte senderId, byte shifterId, byte targetId, string targetRoleId)
         {
             var client = AmongUsClient.Instance;
@@ -157,20 +141,17 @@ namespace TownOfRoles.Roles.Shifter
             }
         }
 
-        [ReactorRpc(SuicideRpc)]
+        [AtomicRpc(SuicideRpc)]
         private static void OnSuicide(byte senderId, byte shifterId)
         {
             var client = AmongUsClient.Instance;
             if (client == null || client.AmHost || senderId != client.HostId) return;
-            // The host's KillManager.Kill already broadcast the networked kill;
-            // clients only need the notification.
+
             var shifter = FindPlayer(shifterId);
             if (shifter != null && shifter.PlayerId == PlayerControl.LocalPlayer?.PlayerId)
                 Local("You tried to shift an Impostor and died.");
         }
 
-        // Helpers
-        // Returns the assigned custom-role id of the player, or null for a baseline Crewmate.
         private static string FindAssignedRoleId(PlayerControl player)
         {
             if (player == null) return null;
@@ -201,7 +182,6 @@ namespace TownOfRoles.Roles.Shifter
             return null;
         }
 
-        // Current task type ids of a player (indexes into ShipStatus.TaskTypes).
         private static byte[] GetTaskTypeIds(PlayerControl player)
         {
             var ids = new List<byte>();
@@ -209,10 +189,9 @@ namespace TownOfRoles.Roles.Shifter
             {
                 for (int i = 0; i < player.Data.Tasks.Count; i++)
                 {
-                    var task = player.Data.Tasks.get_Item(i);
+                    var task = player.Data.Tasks[i];
                     if (task == null) continue;
-                    // TaskInfo.Id is the task-type index into ShipStatus.TaskTypes
-                    // (the interop TaskInfo exposes the native field Id, not TaskType).
+
                     try { ids.Add((byte)task.Id); } catch { }
                 }
             }
@@ -238,5 +217,4 @@ namespace TownOfRoles.Roles.Shifter
             catch { }
         }
     }
-
 }

@@ -2,10 +2,8 @@ using System.Linq;
 
 namespace TownOfRoles.Core
 {
-    // Adapters for game members whose shape changed in the 2026.8.9 interop.
     internal static class GameReflection
     {
-        // MeetingHud.playerStates (public Il2CppReferenceArray).
         public static PlayerVoteArea[] GetPlayerStates(MeetingHud meeting)
         {
             if (meeting == null) return null;
@@ -20,7 +18,6 @@ namespace TownOfRoles.Core
             }
         }
 
-        // MeetingHud.state (public MeetingHud.VoteStates).
         public static MeetingHud.VoteStates GetMeetingState(MeetingHud meeting)
         {
             if (meeting == null) return MeetingHud.VoteStates.NotVoted;
@@ -34,7 +31,6 @@ namespace TownOfRoles.Core
             }
         }
 
-        // ShipStatus.AllVents (public setter).
         public static void SetAllVents(ShipStatus ship, Vent[] vents)
         {
             if (ship == null || vents == null) return;
@@ -47,7 +43,6 @@ namespace TownOfRoles.Core
             }
         }
 
-        // ExileController.completeString (public string).
         public static void SetCompleteString(ExileController controller, string text)
         {
             if (controller == null || text == null) return;
@@ -60,7 +55,6 @@ namespace TownOfRoles.Core
             }
         }
 
-        // ExileController.exiled (public GameData.PlayerInfo).
         public static GameData.PlayerInfo GetExileExiled(ExileController controller)
         {
             if (controller == null) return null;

@@ -3,9 +3,6 @@ using System.Collections.Generic;
 
 namespace TownOfRoles.Core
 {
-    // The single table describing every extra role setting the mod exposes: one row per role,
-    // keyed by the role's config key, listing the fields that sit under it while the role's
-    // count is at least 1.
     internal static class RoleOptionSpecs
     {
         public static readonly Dictionary<string, (string Field, string Label, string Kind)[]> ByRole = new()

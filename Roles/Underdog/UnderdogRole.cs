@@ -4,8 +4,6 @@ using TownOfRoles.Core;
 
 namespace TownOfRoles.Roles.Underdog
 {
-    // Underdog, a passive Impostor whose kill cooldown shrinks when outnumbered. Ported from
-    // the original Town-Of-Us Underdog role.
     internal sealed class UnderdogRole : CustomImpostorRole
     {
         public const string Id = "townofroles.Underdog";

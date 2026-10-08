@@ -1,13 +1,12 @@
 using System;
 using System.Collections.Generic;
-using ClassicUs.Reactor;
+using Atomic;
 using MarshAPI;
 using TownOfRoles.Core;
 using UnityEngine;
 
 namespace TownOfRoles.Roles.Altruist
 {
-    // Altruist gameplay logic (ported from Town-Of-Us' Altruist.cs).
     internal static class AltruistSystem
     {
         private const string ReviveRpc = "townofroles.AltruistRevive";
@@ -25,8 +24,6 @@ namespace TownOfRoles.Roles.Altruist
                    FindClosestBody(altruist) != null;
         }
 
-        // Revives left for a player, for the HUD counter. The same value CanReviveNow gates on,
-        // so the counter cannot disagree with whether the button works.
         internal static int RemainingUses(PlayerControl altruist) =>
             altruist == null || altruist.Data == null ? 0 : GetUses(altruist.PlayerId);
 
@@ -55,7 +52,6 @@ namespace TownOfRoles.Roles.Altruist
             TownOfRolesRpcMux.Send(ReviveRpc, altruist.PlayerId, revived.PlayerId, remaining);
         }
 
-        // Revives the player and removes their dead body (host + clients).
         private static void PerformRevive(PlayerControl revived, DeadBody body)
         {
             if (revived == null || revived.Data == null) return;
@@ -63,11 +59,10 @@ namespace TownOfRoles.Roles.Altruist
             Janitor.JanitorSystem.RemoveBody(body);
         }
 
-        // Nearest unreported dead body within vanilla kill distance.
         private static DeadBody FindClosestBody(PlayerControl player)
         {
             if (player == null || player.Data == null) return null;
-            if (PlayerControl.GameOptions == null) return null; // lobby / pre-game frames
+            if (PlayerControl.GameOptions == null) return null;
             var origin = player.GetTruePosition();
             var killDistance = GameOptionsData.KillDistances[PlayerControl.GameOptions.KillDistance];
             DeadBody best = null;
@@ -99,7 +94,7 @@ namespace TownOfRoles.Roles.Altruist
         private static DateTime GetCooldown(byte altruistId) =>
             Cooldowns.TryGetValue(altruistId, out var value) ? value : DateTime.MinValue;
 
-        [ReactorRpc(RequestReviveRpc)]
+        [AtomicRpc(RequestReviveRpc)]
         private static void OnRequestRevive(byte senderId, byte playerId)
         {
             var client = AmongUsClient.Instance;
@@ -116,7 +111,7 @@ namespace TownOfRoles.Roles.Altruist
             }
         }
 
-        [ReactorRpc(ReviveRpc)]
+        [AtomicRpc(ReviveRpc)]
         private static void OnRevive(byte senderId, byte altruistId, byte revivedId, int usesRemaining)
         {
             var client = AmongUsClient.Instance;

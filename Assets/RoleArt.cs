@@ -5,18 +5,6 @@ using UnityEngine;
 
 namespace TownOfRoles.Assets
 {
-    /// <summary>
-    /// The embedded role icons, decoded from PNG on first use.
-    ///
-    /// <para>The cache is <b>Unity-null-aware</b>: a runtime sprite the game has
-    /// destroyed (its <c>Resources.UnloadUnusedAssets</c> pass between rounds kills
-    /// <c>Sprite.Create</c> objects nothing in a scene references — exactly what a
-    /// managed static is) is treated as absent, so the PNG is decoded again and the
-    /// next ability button of the round gets real art. Without this, round two
-    /// started with the vanilla USE sprite: the statics still held the destroyed
-    /// wrappers, the clone's <c>icon != null</c> check passed on the managed
-    /// reference and never noticed.</para>
-    /// </summary>
     internal static class RoleArt
     {
         private static readonly Assembly Assembly = typeof(RoleArt).Assembly;
@@ -45,19 +33,11 @@ namespace TownOfRoles.Assets
         private static Sprite _mine;
         private static Sprite _abstain;
 
-        /// <summary>Icons resident after the last <see cref="Preload"/> (the boot report).</summary>
         private static int _preloadCount;
 
-        /// <summary>
-        /// Resource names whose decode failed this session. A destroyed sprite is
-        /// re-decoded freely, but a decode that failed is never retried: the
-        /// resource is not going to start existing, and the property getters run
-        /// on the HUD tick, so a retry would log a warning per frame.
-        /// </summary>
         private static readonly System.Collections.Generic.HashSet<string> _failed =
             new System.Collections.Generic.HashSet<string>();
 
-        /// <summary>True when the sprite exists in the Unity sense — alive, not a destroyed native object.</summary>
         private static bool Alive(Sprite sprite) => sprite != null && sprite;
 
         private static Sprite Load(string name)
@@ -80,16 +60,6 @@ namespace TownOfRoles.Assets
             }
         }
 
-        /// <summary>
-        /// Decodes every embedded role icon that is not already resident. The
-        /// return is the count of icons decoded successfully this session, for the
-        /// boot-screen preload to report.
-        ///
-        /// <para>Deliberately re-runs after the game destroyed the sprites (its
-        /// <c>Resources.UnloadUnusedAssets</c> pass between rounds): a decode is
-        /// cheap relative to a round of missing art. Decodes that <i>failed</i> are
-        /// not retried — see <see cref="_failed"/>.</para>
-        /// </summary>
         public static int Preload()
         {
             _engineer = Alive(_engineer) ? _engineer : Load("Engineer.png");

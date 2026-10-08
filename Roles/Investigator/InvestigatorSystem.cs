@@ -7,7 +7,6 @@ using TownOfRoles.Core;
 
 namespace TownOfRoles.Roles.Investigator
 {
-    // Investigator gameplay logic (ported from Town-Of-Us' Investigator.cs).
     internal static class InvestigatorSystem
     {
         private static readonly List<Footprint> Footprints = new();
@@ -16,7 +15,6 @@ namespace TownOfRoles.Roles.Investigator
         public static bool IsInvestigator(PlayerControl player) =>
             player != null && player.Data != null && RoleRegistry.IsAssigned(player, InvestigatorRole.Id);
 
-        // Runs every frame on every client; only the Investigator renders footprints.
         public static void Tick()
         {
             var local = PlayerControl.LocalPlayer;
@@ -47,12 +45,11 @@ namespace TownOfRoles.Roles.Investigator
             try
             {
                 var icon = RoleArt.Footprint;
-                if (icon == null) return; // check before allocating the GameObject
+                if (icon == null) return;
                 var go = new GameObject("ToU_Footprint_" + player.PlayerId);
                 var sr = go.AddComponent<SpriteRenderer>();
                 sr.sprite = icon;
-                // AnonymousFootprints (original Town-Of-Us default): prints are
-                // grey instead of tinted with the walker's color.
+
                 if (RoleConfig.FootprintAnonymous?.Value != false)
                     sr.color = new Color(0.62f, 0.62f, 0.65f, 0.65f);
                 else
@@ -65,7 +62,7 @@ namespace TownOfRoles.Roles.Investigator
                     }
                     else sr.color = new Color(0.62f, 0.62f, 0.65f, 0.65f);
                 }
-                sr.sortingOrder = -50; // on the ground, under players
+                sr.sortingOrder = -50;
                 go.transform.position = player.GetTruePosition();
                 go.transform.localScale = Vector3.one * 0.3f;
                 go.transform.rotation = Quaternion.Euler(0f, 0f, UnityEngine.Random.Range(0f, 360f));
@@ -89,8 +86,6 @@ namespace TownOfRoles.Roles.Investigator
                 }
                 if (fp.Renderer != null)
                 {
-                    // Keep whichever base alpha the print spawned with (grey
-                    // anonymous prints and colored prints share the fade).
                     var color = fp.Renderer.color;
                     float baseA = fp.BaseAlpha > 0.01f ? fp.BaseAlpha : 0.65f;
                     color.a = baseA * (1f - age / duration);

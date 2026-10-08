@@ -4,8 +4,6 @@ using TownOfRoles.Core;
 
 namespace TownOfRoles.Roles.Undertaker
 {
-    // Undertaker, an Impostor who can drag dead bodies and hide them. Ported from the original
-    // Town-Of-Us Undertaker role.
     internal sealed class UndertakerRole : CustomImpostorRole
     {
         public const string Id = "townofroles.Undertaker";

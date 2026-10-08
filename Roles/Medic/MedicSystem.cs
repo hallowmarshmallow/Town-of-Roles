@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using ClassicUs.Reactor;
+using Atomic;
 using MarshAPI;
 using TownOfRoles.Assets;
 using TownOfRoles.Core;
@@ -43,10 +43,8 @@ namespace TownOfRoles.Roles.Medic
             return GetUses(id) > 0 && DateTime.UtcNow >= GetCooldown(id);
         }
 
-        // medic id -> protected player id, exposed for the shield visuals.
         internal static IEnumerable<KeyValuePair<byte, byte>> ShieldPairs => Shields;
 
-        // Shields left for a player, for the HUD counter.
         internal static int RemainingUses(PlayerControl medic) =>
             medic == null || medic.Data == null ? 0 : GetUses(medic.PlayerId);
 
@@ -91,9 +89,6 @@ namespace TownOfRoles.Roles.Medic
                 Shields.Remove(consumedMedic.Value);
         }
 
-        // Host tick: a shield dies with its Medic or its wearer (Town-Of-Us ShowShield.cs
-        // breaks the shield when either side dies). Every client also refreshes the green
-        // shield visual from the synced state.
         public static void Tick()
         {
             var client = AmongUsClient.Instance;
@@ -113,7 +108,7 @@ namespace TownOfRoles.Roles.Medic
             MedicShieldVisuals.Sync();
         }
 
-        [ReactorRpc(BreakRpc)]
+        [AtomicRpc(BreakRpc)]
         private static void OnShieldBreak(byte senderId, byte medicId)
         {
             var client = AmongUsClient.Instance;
@@ -128,9 +123,6 @@ namespace TownOfRoles.Roles.Medic
             return null;
         }
 
-        // Body Report (Town-Of-Us MedicMod/DeadBody.cs): when the Medic reports a body, they
-        // get a private clue, killer's name if very fresh, killer's darker/lighter color shade
-        // if less fresh, "suicide" for Sheriff self-kills, or "too old" past the color window.
         public static void OnAfterReport(ReportEventArgs args)
         {
             if (args == null || args.Body == null || args.Reporter == null) return;
@@ -163,14 +155,12 @@ namespace TownOfRoles.Roles.Medic
             try { SystemChat.Show(message); } catch { }
         }
 
-        // "darker"/"lighter" classification of a player's color (upstream table).
         private static string ShadeOf(byte playerId)
         {
             var player = FindPlayer(playerId);
             var id = player?.Data?.ColorId ?? -1;
             switch (id)
             {
-                // darker shades
                 case 0: case 1: case 2: case 6: case 8: case 9:
                 case 12: case 18: case 19: case 21:
                     return "darker";
@@ -190,7 +180,7 @@ namespace TownOfRoles.Roles.Medic
         public static void OnGameStarted(GameStartedEventArgs _) => Reset();
         public static void OnGameEnded(GameEndedEventArgs _) => Reset();
 
-        [ReactorRpc(RequestProtectRpc)]
+        [AtomicRpc(RequestProtectRpc)]
         private static void OnRequestProtectRpc(byte senderId, byte playerId)
         {
             var client = AmongUsClient.Instance;
@@ -207,7 +197,7 @@ namespace TownOfRoles.Roles.Medic
             }
         }
 
-        [ReactorRpc(ShieldRpc)]
+        [AtomicRpc(ShieldRpc)]
         private static void OnShieldRpc(byte senderId, byte medicId, byte targetId, int usesRemaining)
         {
             var client = AmongUsClient.Instance;
@@ -218,8 +208,6 @@ namespace TownOfRoles.Roles.Medic
         }
     }
 
-    // Green shield ring around the Medic's protected player, the classic Town-Of-Us shield
-    // visual.
     internal static class MedicShieldVisuals
     {
         private static readonly Dictionary<byte, GameObject> Rings = new();
@@ -271,11 +259,6 @@ namespace TownOfRoles.Roles.Medic
                 if (Rings.TryGetValue(target.PlayerId, out var existing) && existing && existing.transform.parent == target.transform)
                     return;
 
-                // Unity-null-aware, not ??=: the ring is a Sprite.Create runtime
-                // object, so the game's Resources.UnloadUnusedAssets pass between
-                // rounds destroys it while this field keeps the dead wrapper. A
-                // managed-null check would never rebuild it and the shield would
-                // silently stop rendering from round two on.
                 if (_ringSprite == null || !_ringSprite) _ringSprite = BuildRingSprite();
                 if (_ringSprite == null) { _spriteFailed = true; return; }
                 if (_spriteFailed) return;
@@ -308,7 +291,6 @@ namespace TownOfRoles.Roles.Medic
             return 5;
         }
 
-        // Soft anti-aliased green ring generated once per session.
         private static Sprite BuildRingSprite()
         {
             const int size = 256;
@@ -343,5 +325,4 @@ namespace TownOfRoles.Roles.Medic
             return null;
         }
     }
-
 }

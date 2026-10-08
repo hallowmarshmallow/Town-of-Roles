@@ -4,7 +4,6 @@ using TownOfRoles.Core;
 
 namespace TownOfRoles.Roles.Executioner
 {
-    // Executioner, a Neutral role with a secret target. Wins when that target is voted out.
     internal sealed class ExecutionerRole : CustomRole
     {
         public const string Id = "townofroles.Executioner";

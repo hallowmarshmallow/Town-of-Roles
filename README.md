@@ -93,7 +93,7 @@ Enabled = false
 sh build.sh
 ```
 
-This builds three DLLs into `dist/plugins/`: `ClassicUs.Reactor.dll`, `MarshAPI.dll` and `TownOfRoles.dll`. It also puts an updater DLL into `dist/patchers/`.
+This builds three DLLs into `dist/plugins/`: `Atomic.dll`, `MarshAPI.dll` and `TownOfRoles.dll`. It also puts an updater DLL into `dist/patchers/`.
 
 Copy `dist/plugins/*.dll` to `<game>/BepInEx/plugins/` and `dist/patchers/*.dll` to `<game>/BepInEx/patchers/`.
 
@@ -109,7 +109,7 @@ tools/          utility and packaging scripts
 ```
 
 Dependencies (cloned as sibling repositories):
-- `Reactor/`: ClassicUs.Reactor (networking & RPC framework)
+- `Atomic/`: Atomic (networking & RPC framework)
 - `MarshAPI/`: MarshAPI (custom role and ability SDK)
 
 To add a new role, copy `Roles/Sheriff/` and rename it.

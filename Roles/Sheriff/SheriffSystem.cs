@@ -1,39 +1,31 @@
 using System.Collections.Generic;
-using ClassicUs.Reactor;
+using Atomic;
 using MarshAPI;
 using TownOfRoles.Core;
 
 namespace TownOfRoles.Roles.Sheriff
 {
-    // Sheriff gameplay logic.
     internal static class SheriffSystem
     {
         private const string KilledRpc = "townofroles.SheriffKilled";
         private const string RequestShootRpc = "townofroles.SheriffRequestShoot";
 
-        // Cross-client "who killed whom" log (ported from Town-Of-Us' Murder.KilledPlayers),
-        // synced via KilledRpc. Currently only KilledBySheriff drives the self-report
-        // suppression; the full log is retained for future roles (Janitor clean-ups,
-        // Altruist revives, Medic shields) that need the killer lookup.
         private static readonly HashSet<(byte Victim, byte Killer)> KilledPlayers = new();
         private static readonly HashSet<byte> KilledBySheriff = new();
 
         public static bool IsSheriff(PlayerControl player) =>
             player != null && player.Data != null && RoleRegistry.IsAssigned(player, SheriffRole.Id);
 
-        // True when the Sheriff has a shootable target in range.
         public static bool HasTarget(PlayerControl sheriff) =>
             sheriff != null && sheriff.Data != null && !sheriff.Data.IsDead &&
             ClosestPlayerFinder.GetClosestTarget(sheriff, out _);
 
-        // Fires the Sheriff's gun at the closest target in range.
         public static void TryShoot(PlayerControl sheriff)
         {
             if (sheriff == null || sheriff.Data == null || sheriff.Data.IsDead) return;
             var client = AmongUsClient.Instance;
             if (client == null) return;
-            // Resolve the target and the shot on the host. Sending a raw custom
-            // kill from a client bypassed the role's target/team validation.
+
             if (!client.AmHost)
             {
                 TownOfRolesRpcMux.Send(RequestShootRpc, sheriff.PlayerId);
@@ -48,20 +40,14 @@ namespace TownOfRoles.Roles.Sheriff
                 return;
             }
 
-            // Non-enemy target. A Crewmate dies too when KillOther is on; a neutral
-            // the Sheriff is not allowed to kill never dies, it is a missed shot,
-            // so only the Sheriff dies (ported Town-Of-Us semantics).
-            if (team != RoleTeamTypes.Neutral && Options.KillOther) PerformKill(sheriff, target);
+            if (team != RoleTeamTypes.Neutral && SheriffOptions.KillOther) PerformKill(sheriff, target);
             PerformKill(sheriff, sheriff);
         }
 
-        // True when the Sheriff may shoot this neutral (gated by Options.KillsNeutrals).
         private static bool IsKillableNeutral(PlayerControl target)
         {
-            if (!Options.KillsNeutrals) return false;
-            // Town-Of-Us' Kill.cs: Jester + Glitch + Arsonist are shootable
-            // (each behind its own upstream option, folded into KillsNeutrals
-            // here). Executioner is this repo's addition, treated like Jester.
+            if (!SheriffOptions.KillsNeutrals) return false;
+
             if (RoleRegistry.IsAssigned(target, "townofroles.Jester")) return true;
             if (RoleRegistry.IsAssigned(target, "townofroles.Executioner")) return true;
             if (RoleRegistry.IsAssigned(target, "townofroles.Glitch")) return true;
@@ -76,22 +62,13 @@ namespace TownOfRoles.Roles.Sheriff
             var victim = target.Data.PlayerId;
             var murderer = killer.Data.PlayerId;
 
-            // KillManager performs the networked kill (body, animation, sound). A shot the
-            // BeforeMurder gate refused (the Medic shield) leaves the target alive and is not
-            // recorded, since the record is what suppresses reporting the body. Host-only, so
-            // the returned bool is the host's own gate.
-            // NOTE: the suicide leg calls Kill(sheriff, sheriff). If a lobby test shows the host
-            // pipeline misbehaving with killer == target, switch it to a KillRequest with
-            // CreateDeadBody/ShowKillAnimation = false.
             if (!KillManager.Kill(killer, target)) return;
 
-            // Record locally and tell every client (including ourselves, dedup makes
-            // the local add + RPC add idempotent).
             Record(victim, murderer);
             TownOfRolesRpcMux.Send(KilledRpc, victim, murderer);
         }
 
-        [ReactorRpc(KilledRpc)]
+        [AtomicRpc(KilledRpc)]
         private static void OnKilled(byte senderId, byte victim, byte murderer)
         {
             var client = AmongUsClient.Instance;
@@ -99,7 +76,7 @@ namespace TownOfRoles.Roles.Sheriff
             Record(victim, murderer);
         }
 
-        [ReactorRpc(RequestShootRpc)]
+        [AtomicRpc(RequestShootRpc)]
         private static void OnRequestShoot(byte senderId, byte playerId)
         {
             var client = AmongUsClient.Instance;
@@ -119,15 +96,12 @@ namespace TownOfRoles.Roles.Sheriff
             if (murderer != victim) KilledBySheriff.Add(victim);
         }
 
-        // GameEvents.BeforeReport hook: the Sheriff cannot report bodies they shot themselves
-        // (Town-Of-Us' CantReport.cs, gated by Options.BodyReport).
         public static void OnBeforeReport(ReportEventArgs args)
         {
-            if (Options.BodyReport) return;
+            if (SheriffOptions.BodyReport) return;
             if (args.IsEmergencyMeeting || args.Body == null || args.Reporter == null) return;
             if (!IsSheriff(args.Reporter)) return;
-            // On non-host clients this depends on the kill-record RPC having arrived
-            // before the player presses Report; the host is always authoritative here.
+
             if (KilledBySheriff.Contains(args.Body.PlayerId)) args.Cancelled = true;
         }
 
