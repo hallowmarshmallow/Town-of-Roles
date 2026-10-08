@@ -24,5 +24,4 @@ Screenshot_*.png
 il2cpp_dump*/
 interop/
 *.dummy.dll
-
-# Scratch & local tooling
+bugs.md
